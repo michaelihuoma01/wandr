@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "outDir": "lib",
+    "sourceMap": true,
+    "strict": true,
+    "target": "es2017",
+    "skipLibCheck": true, // Add this to skip checking .d.ts files from dependencies if they cause issues
+    "esModuleInterop": true // Often helpful for CJS/ESM interop
+  },
+  "compileOnSave": true,
+  "include": [
+    "src"
+  ]
+}

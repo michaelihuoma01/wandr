@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "248207776942",
+    "project_id": "locale-lens-uslei",
+    "storage_bucket": "locale-lens-uslei.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:248207776942:android:764ecd4d3b547a9af5e13f",
+        "android_client_info": {
+          "package_name": "com.michaelihuoma.wandr"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAg2DE8DzvbqUmHhY1e7ACO2JN9DIn2K04"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
