@@ -1,390 +1,509 @@
 // functions/src/analyze_input_flow.ts
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { compareTwoStrings } from "string-similarity";
+import { getDistanceFromLatLonInKm } from "./utils";
+import { defineString } from "firebase-functions/params";
 
-// Adjusted import path for the Genkit 'ai' instance
-import { ai } from './genkit_config'; 
-import { z } from '@genkit-ai/core';
+// Get API keys from Firebase parameters (v2 functions)
+const geminiApiKey = defineString("GEMINI_API_KEY");
+const googlePlacesApiKey = defineString("GOOGLE_PLACES_API_KEY");
+const foursquareApiKey = defineString("FOURSQUARE_API_KEY");
+const tripAdvisorApiKey = defineString("TRIPADVISOR_API_KEY");
+const zomatoApiKey = defineString("ZOMATO_API_KEY");
 
-// Adjusted import path for utility functions
-import { getDistanceFromLatLonInKm } from './utils'; 
-import { compareTwoStrings } from 'string-similarity';
+// Initialize Gemini
+let genAI: GoogleGenerativeAI;
 
-const placeholderImage = "https://placehold.co/600x400.png";
-
-// Schema for individual place details, used by tools and final output
-export const PlaceDetailsSchema = z.object({
-  placeId: z.string().optional().describe("The unique identifier for the place from its source API (e.g., Google Place ID, Foursquare FSQ ID). If unavailable or the source does not provide a stable ID, this field MUST BE OMITTED."),
-  dataSource: z.string().optional().describe("The source of this place data (e.g., 'Google', 'Foursquare'). This indicates the origin of the place information. If unavailable, this field MUST BE OMITTED."),
-  name: z.string().describe("The official name of the location. This field is required."),
-  description: z.string().describe("A brief, engaging description of the location. This field is required."),
-  latitude: z.number().describe("The precise latitude of the location. This field is required."),
-  longitude: z.number().describe("The precise longitude of the location. This field is required."),
-  type: z.string().describe("The primary type or category of the location (e.g., 'Restaurant', 'Coffee Shop', 'Museum'). This field is required."),
-  imageUrls: z.array(z.string().url())
-    .optional()
-    .describe("An array of direct, publicly accessible URLs to high-quality images from the respective API. The tool constructs these URLs. THE LLM MUST USE THIS ARRAY AND ITS CONTENTS EXACTLY AS PROVIDED by the tool. If no images are available from the tool, this field MUST BE OMITTED."),
-  rating: z.number().min(0).max(5).optional().describe("The location's rating, typically on a 1-5 scale. If unavailable, this field MUST BE OMITTED."),
-  priceLevel: z.string().optional().describe("A string representing the price level (e.g., '\$', '\$\$', '\$\$\$'). If unavailable, this field MUST BE OMITTED."),
-  reviewTexts: z.array(z.string()).optional().describe("An array of up to 3 concise user review snippets. If unavailable or empty, this field MUST BE OMITTED."),
-  tags: z.array(z.string()).optional().describe("An array of relevant tags or keywords associated with the place. If unavailable or empty, this field MUST BE OMITTED."),
-  websiteUrl: z.string().url().optional().describe("The official website URL. If unavailable, this field MUST BE OMITTED by the LLM from the output JSON."),
-  phoneNumber: z.string().optional().describe("The primary phone number. If unavailable, this field MUST BE OMITTED by the LLM from the output JSON."),
-  menuUrl: z.string().url().optional().describe("A direct URL to the location's menu. If unavailable, this field MUST BE OMITTED by the LLM from the output JSON."),
-  socialLinks: z.array(z.object({
-    platform: z.string().describe("Name of the social media platform (e.g., 'Facebook', 'Instagram')."),
-    url: z.string().url().describe("Full URL to the social media profile."),
-  })).optional().describe("An array of social media links. If unavailable or empty, this field MUST BE OMITTED."),
-});
-export type PlaceDetails = z.infer<typeof PlaceDetailsSchema>;
-
-
-// Input schema for the main flow
-export const AnalyzeInputAndSuggestLocationsInputSchema = z.object({
-  textInput: z.string().optional(),
-  imageInputUri: z.string().url().optional(),
-  inputType: z.enum(['text', 'image']),
-  latitude: z.number(),
-  longitude: z.number(),
-  searchRadius: z.number().optional().default(20000), // Default radius in meters (20km)
-});
-export type AnalyzeInputAndSuggestLocationsInput = z.infer<typeof AnalyzeInputAndSuggestLocationsInputSchema>;
-
-// Output schema for the main flow
-export const AnalyzeInputAndSuggestLocationsOutputSchema = z.object({
-  locations: z.array(PlaceDetailsSchema).describe("An array of suggested locations, deduplicated and sorted by relevance/distance."),
-});
-export type AnalyzeInputAndSuggestLocationsOutput = z.infer<typeof AnalyzeInputAndSuggestLocationsOutputSchema>;
-
-
-// Schema for LLM's initial place suggestions (queries or names)
-export const LLMSuggestionSchema = z.object({
-  placeName: z.string().describe('The conceptual name of a place or a type of place the user might be interested in (e.g., "Eiffel Tower", "quiet coffee shop").'),
-  searchQuery: z.string().describe('A concise and effective search query string (e.g., "Eiffel Tower Paris", "quiet coffee shops near me") that can be used with Google Places API or Foursquare API to find specific establishments related to the placeName.'),
-});
-
-export const LLMSuggestionsOutputSchema = z.object({
-  suggestions: z.array(LLMSuggestionSchema).min(3).max(5).describe('Array of 3-5 place suggestions, each with a conceptual name and a practical search query.'),
-});
-
-
-// Tool: Fetch place details from Google Places API
-export const fetchPlaceDetailsFromGoogle = ai.defineTool(
-  {
-    name: 'fetchPlaceDetailsFromGoogle',
-    description: 'Fetches detailed information about a specific place from Google Places API using a search query and location context. Returns details for the most relevant match.',
-    inputSchema: z.object({
-      searchQuery: z.string().describe("The search query string (e.g., 'Eiffel Tower Paris', 'best pizza nearby')."),
-      latitude: z.number().describe("User's current latitude."),
-      longitude: z.number().describe("User's current longitude."),
-    }),
-    outputSchema: PlaceDetailsSchema.nullable().describe("Detailed information for one matching place, or null if no relevant place is found or an error occurs."),
-  },
-  async ({ searchQuery, latitude, longitude }) => {
-    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-    console.log("[Google Tool] GOOGLE_PLACES_API_KEY availability:", { configured: !!apiKey, valueFirstChars: apiKey ? apiKey.substring(0, 5) + "..." : "Not Set/Undefined" });
-
+function getGenAI() {
+  if (!genAI) {
+    const apiKey = geminiApiKey.value();
     if (!apiKey) {
-      console.error("[Google Tool] CRITICAL ERROR: GOOGLE_PLACES_API_KEY (environment variable) is not configured on the server. Cannot fetch Google Place details.");
-      return {
-        name: searchQuery,
-        description: "Could not fetch details: Google API key not configured on server. Please check server environment variables.",
-        latitude: 0, longitude: 0, type: "Configuration Error",
-        imageUrls: [placeholderImage],
-        dataSource: 'Google',
-      } as PlaceDetails;
+      throw new Error("Gemini API key not configured");
     }
+    genAI = new GoogleGenerativeAI(apiKey);
+  }
+  return genAI;
+}
 
-    try {
-      const searchUrl = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
-      searchUrl.searchParams.append("query", searchQuery);
-      searchUrl.searchParams.append("location", `${latitude},${longitude}`);
-      searchUrl.searchParams.append("radius", "20000");
-      searchUrl.searchParams.append("key", apiKey);
 
-      console.log(`[Google Tool] TextSearch URL: ${searchUrl.toString().replace(apiKey, "GOOGLE_API_KEY_HIDDEN")}`);
-      const searchResponse = await fetch(searchUrl.toString());
-      if (!searchResponse.ok) {
-        const errorText = await searchResponse.text();
-        console.error(`[Google Tool] TextSearch API error: ${searchResponse.status} ${errorText}`);
-        return null;
-      }
-      const searchData = await searchResponse.json();
-      if (!searchData.results || searchData.results.length === 0) {
-        console.log(`[Google Tool] TextSearch: No results for query "${searchQuery}"`);
-        return null;
-      }
-      const foundPlace = searchData.results[0];
-      const placeId = foundPlace.place_id;
+// Type definitions
+export interface PlaceDetails {
+  placeId?: string;
+  dataSource?: string;
+  name: string;
+  description: string;
+  latitude: number;
+  longitude: number;
+  type: string;
+  imageUrls?: string[];
+  rating?: number;
+  priceLevel?: string;
+  reviewTexts?: string[];
+  tags?: string[];
+  websiteUrl?: string;
+  phoneNumber?: string;
+  menuUrl?: string;
+  socialLinks?: Array<{
+    platform: string;
+    url: string;
+  }>;
+}
 
-      if (!placeId) {
-        console.log(`[Google Tool] TextSearch: No place_id found for "${searchQuery}"'s top result.`);
-        return null;
-      }
+export interface AnalyzeInputAndSuggestLocationsInput {
+  textInput?: string;
+  imageInputUri?: string;
+  inputType: "text" | "image";
+  latitude: number;
+  longitude: number;
+  searchRadius?: number;
+}
 
-      const detailsUrl = new URL("https://maps.googleapis.com/maps/api/place/details/json");
-      detailsUrl.searchParams.append("place_id", placeId);
-      detailsUrl.searchParams.append("fields", "name,place_id,geometry,types,editorial_summary,website,formatted_phone_number,rating,price_level,reviews,photos");
-      detailsUrl.searchParams.append("key", apiKey);
+export interface AnalyzeInputAndSuggestLocationsOutput {
+  locations: PlaceDetails[];
+}
 
-      console.log(`[Google Tool] PlaceDetails URL: ${detailsUrl.toString().replace(apiKey, "GOOGLE_API_KEY_HIDDEN")}`);
-      const detailsResponse = await fetch(detailsUrl.toString());
-      if (!detailsResponse.ok) {
-         const errorText = await detailsResponse.text();
-        console.error(`[Google Tool] PlaceDetails API error: ${detailsResponse.status} ${errorText}`);
-        return null;
-      }
-      const detailsData = await detailsResponse.json();
-      const details = detailsData.result;
+interface LLMSuggestion {
+  placeName: string;
+  searchQuery: string;
+}
 
-      if (!details) {
-        console.log(`[Google Tool] PlaceDetails: No details found for place_id "${placeId}"`);
-        return null;
-      }
+interface LLMSuggestionsOutput {
+  suggestions: LLMSuggestion[];
+}
 
-      const actualImageUrls: string[] = [];
-      if (details.photos && details.photos.length > 0) {
-        details.photos.slice(0, 5).forEach((photo: any) => {
-          if (photo.photo_reference && apiKey) {
-            actualImageUrls.push(`https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference=${photo.photo_reference}&key=${apiKey}`);
-          }
-        });
-      }
-      console.log(`[Google Tool] Constructed image URLs for ${details.name}: ${actualImageUrls.length}`);
+// Helper function to get LLM suggestions for text
+async function getTextSuggestions(
+  textInput: string,
+  latitude: number,
+  longitude: number
+): Promise<LLMSuggestionsOutput> {
+  const model = getGenAI().getGenerativeModel({ model: "gemini-1.5-flash" });
+  
+  const prompt = `
+You are an AI assistant that suggests diverse and relevant search queries for finding local places based on user input.
 
-      const output: PlaceDetails = {
-        placeId: details.place_id || undefined,
-        dataSource: 'Google',
-        name: details.name || searchQuery,
-        description: details.editorial_summary?.overview || foundPlace.formatted_address || `A notable place: ${details.name || searchQuery}`,
-        latitude: details.geometry.location.lat,
-        longitude: details.geometry.location.lng,
-        type: details.types?.[0]?.replace(/_/g, ' ') || 'Place',
-        imageUrls: actualImageUrls.length > 0 ? actualImageUrls : undefined,
-        rating: details.rating ? parseFloat(details.rating.toFixed(1)) : undefined,
-        priceLevel: details.price_level !== undefined ? '$'.repeat(details.price_level + 1) : undefined,
-        reviewTexts: details.reviews?.map((r: any) => r.text.substring(0, 150) + (r.text.length > 150 ? "..." : "")).slice(0, 3) || undefined,
-        tags: details.types?.map((t: string) => t.replace(/_/g, ' ')).filter((t: string) => ![^'point_of_interest', 'establishment'].includes(t.toLowerCase())).slice(0, 4) || undefined,
-        websiteUrl: details.website || undefined,
-        phoneNumber: details.formatted_phone_number || undefined,
-        menuUrl: undefined,
-        socialLinks: undefined,
-      };
-      for (const key in output) {
-        if (output[key as keyof PlaceDetails] === undefined) {
-          delete output[key as keyof PlaceDetails];
+User's text input: "${textInput}"
+User's location: Latitude ${latitude}, Longitude ${longitude}
+
+Based on this, provide 3-5 diverse search queries for finding local places.
+Return ONLY a valid JSON object with suggestions array, each containing placeName and searchQuery.
+
+Example format:
+{
+  "suggestions": [
+    {"placeName": "Cozy Coffee Shop", "searchQuery": "artisan coffee shops near me"},
+    {"placeName": "Pet-Friendly Restaurant", "searchQuery": "dog friendly restaurants"}
+  ]
+}
+
+Return only the JSON, no additional text.`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    // Extract JSON from the response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]) as LLMSuggestionsOutput;
+    }
+    
+    throw new Error("Invalid response format from LLM");
+  } catch (error) {
+    console.error("[LLM] Error getting text suggestions:", error);
+    // Fallback suggestions
+    return {
+      suggestions: [
+        { placeName: "Nearby Places", searchQuery: `${textInput} near me` },
+        { placeName: "Popular Spots", searchQuery: `best ${textInput}` },
+        { placeName: "Local Favorites", searchQuery: `top rated ${textInput}` }
+      ]
+    };
+  }
+}
+
+// Helper function to get LLM suggestions for image
+async function getImageSuggestions(
+  imageUri: string,
+  latitude: number,
+  longitude: number
+): Promise<LLMSuggestionsOutput> {
+  const model = getGenAI().getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+  
+  try {
+    // Fetch image data
+    const imageResponse = await fetch(imageUri);
+    const imageArrayBuffer = await imageResponse.arrayBuffer();
+    const imageBase64 = Buffer.from(imageArrayBuffer).toString('base64');
+    
+    const prompt = `
+Analyze this image and suggest relevant local places to visit.
+User's location: Latitude ${latitude}, Longitude ${longitude}
+
+Provide 3-5 diverse search queries based on what you see in the image.
+Return ONLY a valid JSON object with suggestions array.
+
+Example format:
+{
+  "suggestions": [
+    {"placeName": "Similar Restaurant", "searchQuery": "restaurants with outdoor seating"},
+    {"placeName": "Related Activity", "searchQuery": "parks for picnic"}
+  ]
+}
+
+Return only the JSON, no additional text.`;
+
+    const result = await model.generateContent([
+      prompt,
+      {
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: imageBase64
         }
       }
-      console.log(`[Google Tool] Successfully fetched details for: ${output.name}`);
-      return output;
-
-    } catch (error: any) {
-      console.error(`[Google Tool] Error fetching place details for query "${searchQuery}":`, error.message, error.stack);
-      return null;
+    ]);
+    
+    const response = await result.response;
+    const text = response.text();
+    
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]) as LLMSuggestionsOutput;
     }
+    
+    throw new Error("Invalid response format from LLM");
+  } catch (error) {
+    console.error("[LLM] Error getting image suggestions:", error);
+    // Fallback suggestions
+    return {
+      suggestions: [
+        { placeName: "Similar Places", searchQuery: "popular places near me" },
+        { placeName: "Nearby Attractions", searchQuery: "things to do nearby" },
+        { placeName: "Local Spots", searchQuery: "local favorites" }
+      ]
+    };
   }
-);
+}
 
-// Tool: Fetch place details from Foursquare API
-export const fetchPlaceDetailsFromFoursquare = ai.defineTool(
-  {
-    name: 'fetchPlaceDetailsFromFoursquare',
-    description: 'Fetches detailed information about a place from Foursquare API based on a search query and location. Returns details for the most relevant match.',
-    inputSchema: z.object({
-      searchQuery: z.string().describe("The search query string (e.g., 'Eiffel Tower Paris', 'best pizza nearby')."),
-      latitude: z.number().describe("User's current latitude."),
-      longitude: z.number().describe("User's current longitude."),
-    }),
-    outputSchema: PlaceDetailsSchema.nullable().describe("Detailed information for one matching place, or null if no relevant place is found or an error occurs."),
-  },
-  async ({ searchQuery, latitude, longitude }) => {
-    const apiKey = process.env.FOURSQUARE_API_KEY;
-    console.log("[Foursquare Tool] FOURSQUARE_API_KEY availability:", { configured: !!apiKey });
+// Fetch place details from Google Places
+async function fetchPlaceDetailsFromGoogle(
+  searchQuery: string,
+  latitude: number,
+  longitude: number
+): Promise<PlaceDetails | null> {
+  const apiKey = googlePlacesApiKey.value();
+  
+  if (!apiKey) {
+    console.error("[Google Tool] API key not configured");
+    return null;
+  }
 
-    if (!apiKey) {
-      console.error("[Foursquare Tool] CRITICAL ERROR: FOURSQUARE_API_KEY (environment variable) is not configured on the server. Cannot fetch Foursquare details.");
-       return {
-        name: searchQuery,
-        description: "Could not fetch details: Foursquare API key not configured on server. Please check server environment variables.",
-        latitude: 0, longitude: 0, type: "Configuration Error",
-        imageUrls: [placeholderImage],
-        dataSource: 'Foursquare',
-      } as PlaceDetails;
-    }
+  try {
+    // Text search
+    const searchUrl = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
+    searchUrl.searchParams.append("query", searchQuery);
+    searchUrl.searchParams.append("location", `${latitude},${longitude}`);
+    searchUrl.searchParams.append("radius", "20000");
+    searchUrl.searchParams.append("key", apiKey);
 
-    const headers = { 'Authorization': apiKey, 'Accept': 'application/json', 'Foursquare-Version': '20230314' };
+    const searchResponse = await fetch(searchUrl.toString());
+    if (!searchResponse.ok) return null;
+    
+    const searchData = await searchResponse.json();
+    if (!searchData.results || searchData.results.length === 0) return null;
+    
+    const foundPlace = searchData.results[0];
+    const placeId = foundPlace.place_id;
 
-    try {
-      const searchParams = new URLSearchParams({
-        query: searchQuery,
-        ll: `${latitude},${longitude}`,
-        radius: '20000',
-        limit: '1',
-        fields: 'fsq_id,name,geocodes,location,categories,website,social_media,tel,email,rating,price,description,menu',
+    // Get details
+    const detailsUrl = new URL("https://maps.googleapis.com/maps/api/place/details/json");
+    detailsUrl.searchParams.append("place_id", placeId);
+    detailsUrl.searchParams.append("fields", "name,place_id,geometry,types,editorial_summary,website,formatted_phone_number,rating,price_level,reviews,photos");
+    detailsUrl.searchParams.append("key", apiKey);
+
+    const detailsResponse = await fetch(detailsUrl.toString());
+    if (!detailsResponse.ok) return null;
+    
+    const detailsData = await detailsResponse.json();
+    const details = detailsData.result;
+
+    const imageUrls: string[] = [];
+    if (details.photos && details.photos.length > 0) {
+      details.photos.slice(0, 5).forEach((photo: any) => {
+        if (photo.photo_reference) {
+          imageUrls.push(`https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference=${photo.photo_reference}&key=${apiKey}`);
+        }
       });
-      const searchUrl = `https://api.foursquare.com/v3/places/search?${searchParams.toString()}`;
-      console.log(`[Foursquare Tool] Search URL: ${searchUrl}`);
+    }
 
-      const searchResponse = await fetch(searchUrl, { headers });
-      if (!searchResponse.ok) {
-        const errorText = await searchResponse.text();
-        console.error(`[Foursquare Tool] Search API error: ${searchResponse.status} ${errorText}`);
-        return null;
-      }
-      const searchData = await searchResponse.json();
-      if (!searchData.results || searchData.results.length === 0) {
-        console.log(`[Foursquare Tool] Search: No results for query "${searchQuery}"`);
-        return null;
-      }
-      const fsqPlace = searchData.results[0];
+    return {
+      placeId: details.place_id,
+      dataSource: "Google",
+      name: details.name || searchQuery,
+      description: details.editorial_summary?.overview || foundPlace.formatted_address || "A notable place",
+      latitude: details.geometry.location.lat,
+      longitude: details.geometry.location.lng,
+      type: details.types?.[0]?.replace(/_/g, " ") || "Place",
+      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+      rating: details.rating,
+      priceLevel: details.price_level !== undefined ? "$".repeat(details.price_level + 1) : undefined,
+      reviewTexts: details.reviews?.map((r: any) => r.text.substring(0, 150)).slice(0, 3),
+      tags: details.types?.map((t: string) => t.replace(/_/g, " ")).slice(0, 4),
+      websiteUrl: details.website,
+      phoneNumber: details.formatted_phone_number,
+    };
+  } catch (error) {
+    console.error("[Google Tool] Error:", error);
+    return null;
+  }
+}
 
-      const photosUrl = `https://api.foursquare.com/v3/places/${fsqPlace.fsq_id}/photos?limit=5&sort=POPULAR`;
-      const photosResponse = await fetch(photosUrl, { headers });
-      let actualImageUrls: string[] = [];
-      if (photosResponse.ok) {
-        const fsqPhotos = await photosResponse.json();
-        actualImageUrls = fsqPhotos.map((p: any) => `${p.prefix}original${p.suffix}`);
-      }
-      console.log(`[Foursquare Tool] Constructed image URLs for ${fsqPlace.name}: ${actualImageUrls.length}`);
+// Fetch place details from Foursquare
+async function fetchPlaceDetailsFromFoursquare(
+  searchQuery: string,
+  latitude: number,
+  longitude: number
+): Promise<PlaceDetails | null> {
+  const apiKey = foursquareApiKey.value();
+  
+  if (!apiKey) {
+    console.error("[Foursquare Tool] API key not configured");
+    return null;
+  }
 
-      const tipsUrl = `https://api.foursquare.com/v3/places/${fsqPlace.fsq_id}/tips?limit=3&sort=POPULAR`;
-      const tipsResponse = await fetch(tipsUrl, { headers });
-      let reviewTexts: string[] = [];
-      if (tipsResponse.ok) {
-        const fsqTips = await tipsResponse.json();
-        reviewTexts = fsqTips.map((t: any) => t.text.substring(0,150) + (t.text.length > 150 ? "..." : ""));
-      }
+  const headers = { 
+    "Authorization": apiKey, 
+    "Accept": "application/json" 
+  };
 
-      const socialLinks: { platform: string; url: string }[] = [];
-      if (fsqPlace.social_media) {
-        if (fsqPlace.social_media.facebook_id) socialLinks.push({ platform: 'Facebook', url: `https://www.facebook.com/${fsqPlace.social_media.facebook_id}` });
-        if (fsqPlace.social_media.instagram) socialLinks.push({ platform: 'Instagram', url: `https://www.instagram.com/${fsqPlace.social_media.instagram}` });
-        if (fsqPlace.social_media.twitter) socialLinks.push({ platform: 'Twitter', url: `https://twitter.com/${fsqPlace.social_media.twitter}` });
-      }
+  try {
+    const searchParams = new URLSearchParams({
+      query: searchQuery,
+      ll: `${latitude},${longitude}`,
+      radius: "20000",
+      limit: "1",
+    });
+    
+    const searchUrl = `https://api.foursquare.com/v3/places/search?${searchParams.toString()}`;
+    const searchResponse = await fetch(searchUrl, { headers });
+    
+    if (!searchResponse.ok) return null;
+    
+    const searchData = await searchResponse.json();
+    if (!searchData.results || searchData.results.length === 0) return null;
+    
+    const fsqPlace = searchData.results[0];
 
-      const output: PlaceDetails = {
-        placeId: fsqPlace.fsq_id,
-        dataSource: 'Foursquare',
-        name: fsqPlace.name,
-        description: fsqPlace.description || fsqPlace.categories?.map((c: any) => c.name).join(', ') || `Popular Foursquare venue: ${fsqPlace.name}`,
-        latitude: fsqPlace.geocodes.main.latitude,
-        longitude: fsqPlace.geocodes.main.longitude,
-        type: fsqPlace.categories?.[0]?.name || 'Place',
-        imageUrls: actualImageUrls.length > 0 ? actualImageUrls : undefined,
-        rating: fsqPlace.rating ? parseFloat((fsqPlace.rating / 2).toFixed(1)) : undefined,
-        priceLevel: fsqPlace.price ? '$'.repeat(fsqPlace.price) : undefined,
-        reviewTexts: reviewTexts.length > 0 ? reviewTexts : undefined,
-        tags: fsqPlace.categories?.map((c: any) => c.name).slice(0, 4) || undefined,
-        websiteUrl: fsqPlace.website || undefined,
-        phoneNumber: fsqPlace.tel || undefined,
-        menuUrl: fsqPlace.menu || undefined,
-        socialLinks: socialLinks.length > 0 ? socialLinks : undefined,
-      };
-       for (const key in output) {
-        if (output[key as keyof PlaceDetails] === undefined) {
-          delete output[key as keyof PlaceDetails];
-        }
-      }
-      console.log(`[Foursquare Tool] Successfully fetched details for: ${output.name}`);
-      return output;
+    // Get photos
+    const photosUrl = `https://api.foursquare.com/v3/places/${fsqPlace.fsq_id}/photos?limit=5`;
+    const photosResponse = await fetch(photosUrl, { headers });
+    let imageUrls: string[] = [];
+    if (photosResponse.ok) {
+      const photos = await photosResponse.json();
+      imageUrls = photos.map((p: any) => `${p.prefix}original${p.suffix}`);
+    }
 
-    } catch (error: any) {
-      console.error(`[Foursquare Tool] Error fetching place details for query "${searchQuery}":`, error.message, error.stack);
-      return null;
+    // Get tips
+    const tipsUrl = `https://api.foursquare.com/v3/places/${fsqPlace.fsq_id}/tips?limit=3`;
+    const tipsResponse = await fetch(tipsUrl, { headers });
+    let reviewTexts: string[] = [];
+    if (tipsResponse.ok) {
+      const tips = await tipsResponse.json();
+      reviewTexts = tips.map((t: any) => t.text.substring(0, 150));
+    }
+
+    return {
+      placeId: fsqPlace.fsq_id,
+      dataSource: "Foursquare",
+      name: fsqPlace.name,
+      description: fsqPlace.categories?.map((c: any) => c.name).join(", ") || "Popular venue",
+      latitude: fsqPlace.geocodes.main.latitude,
+      longitude: fsqPlace.geocodes.main.longitude,
+      type: fsqPlace.categories?.[0]?.name || "Place",
+      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+      rating: fsqPlace.rating ? fsqPlace.rating / 2 : undefined,
+      reviewTexts: reviewTexts.length > 0 ? reviewTexts : undefined,
+      tags: fsqPlace.categories?.map((c: any) => c.name).slice(0, 4),
+    };
+  } catch (error) {
+    console.error("[Foursquare Tool] Error:", error);
+    return null;
+  }
+}
+
+// Placeholder for TripAdvisor integration
+async function fetchPlaceDetailsFromTripAdvisor(
+  searchQuery: string,
+  latitude: number,
+  longitude: number
+): Promise<PlaceDetails | null> {
+  const apiKey = tripAdvisorApiKey.value();
+  
+  if (!apiKey) {
+    return null;
+  }
+
+  try {
+    // TODO: Implement TripAdvisor API integration
+    console.log("[TripAdvisor Tool] Would search for:", searchQuery);
+    return null;
+  } catch (error) {
+    console.error("[TripAdvisor Tool] Error:", error);
+    return null;
+  }
+}
+
+// Placeholder for Zomato integration
+async function fetchPlaceDetailsFromZomato(
+  searchQuery: string,
+  latitude: number,
+  longitude: number
+): Promise<PlaceDetails | null> {
+  const apiKey = zomatoApiKey.value();
+  
+  if (!apiKey) {
+    return null;
+  }
+
+  try {
+    // TODO: Implement Zomato API integration
+    console.log("[Zomato Tool] Would search for:", searchQuery);
+    return null;
+  } catch (error) {
+    console.error("[Zomato Tool] Error:", error);
+    return null;
+  }
+}
+
+// Deduplication function
+function deduplicateLocations(locations: PlaceDetails[]): PlaceDetails[] {
+  const uniqueLocations: PlaceDetails[] = [];
+  const seenPlaceIds = new Set<string>();
+
+  for (const location of locations) {
+    // Check if we've seen this place ID
+    if (location.placeId && seenPlaceIds.has(location.placeId)) {
+      continue;
+    }
+
+    // Check for similar locations by name and proximity
+    let isDuplicate = false;
+    for (const existing of uniqueLocations) {
+      const nameSimilarity = compareTwoStrings(
+        location.name.toLowerCase(),
+        existing.name.toLowerCase()
+      );
+      const distance = getDistanceFromLatLonInKm(
+        location.latitude,
+        location.longitude,
+        existing.latitude,
+        existing.longitude
+      );
+
+      if (nameSimilarity > 0.85 && distance < 0.15) {
+        isDuplicate = true;
+        break;
+      }
+    }
+
+    if (!isDuplicate) {
+      uniqueLocations.push(location);
+      if (location.placeId) {
+        seenPlaceIds.add(location.placeId);
+      }
     }
   }
-);
 
+  return uniqueLocations;
+}
 
-// Common system instruction for the LLM
-const commonPromptSystemInstruction = `
-You are an expert local guide AI. Your goal is to suggest specific, real places based on user input (text or image) and their location.
-You will be provided with a list of search queries or place names.
-For each item in that list, you MUST use the 'fetchPlaceDetailsFromGoogle' tool AND the 'fetchPlaceDetailsFromFoursquare' tool to get detailed information.
-Ensure you accurately map the data from the tools to the JSON output schema.
-
-CRITICALLY IMPORTANT FOR ALL FIELDS:
-1.  The tools provide various fields. You MUST use the data from these tools EXACTLY AS PROVIDED to populate the corresponding fields in your final JSON output (defined by 'PlaceDetailsSchema').
-2.  For optional fields in the 'PlaceDetailsSchema' (like rating, priceLevel, reviewTexts, tags, websiteUrl, phoneNumber, menuUrl, socialLinks, imageUrls, placeId, dataSource):
-    *   If a tool provides a value for an optional field, you MUST include that field and its value in your output.
-    *   If a tool DOES NOT provide a value for an optional field (i.e., the field is 'undefined' or missing in the tool's output), YOU MUST OMIT THE FIELD ENTIRELY for that location in your JSON output. DO NOT use 'null', an empty string "", or an empty array [] for these missing optional fields unless the schema specifically allows it for that field (e.g. imageUrls could be an empty array if the tool returns it as such, but it's better to omit if truly no images). If a field like 'websiteUrl' is missing from the tool output, it should NOT appear in your JSON for that location.
-3.  The 'imageUrls' field: If the tool provides an array of image URLs, use it as is. The tool is responsible for constructing correct, full URLs (including API keys if needed for direct display). If the tool provides an empty array or no 'imageUrls' field, OMIT the 'imageUrls' field from your output for that location. Do NOT substitute a placeholder UNLESS the tool explicitly provides a placeholder URL in the array.
-4.  Pay close attention to data types. Numbers must be numbers, strings must be strings, arrays must be arrays.
-
-Your final response MUST be a JSON object conforming to 'AnalyzeInputAndSuggestLocationsOutputSchema', containing a 'locations' array.
-Each object in the 'locations' array MUST conform to 'PlaceDetailsSchema'.
-Do not add any commentary or conversational text outside the JSON structure.
-Prioritize accuracy and directly use the tool-provided data.
-`;
-
-// LLM Prompts for generating initial search queries
-export const textSuggestionPrompt = ai.definePrompt({
-  name: 'textSuggestionPrompt',
-  input: {
-    schema: z.object({
-      textInput: z.string(),
-      latitude: z.number(),
-      longitude: z.number(),
-    }),
-  },
-  output: { schema: LLMSuggestionsOutputSchema },
-  system: "You are an AI assistant that suggests 3-5 diverse and relevant search queries for finding local places based on a user's text input and location. Focus on variety and potential user intent.",
-  prompt: `User's text input: "{{{textInput}}}"
-User's current location: Latitude {{{latitude}}}, Longitude {{{longitude}}}
-
-Based on this, provide 3-5 diverse search queries. For each, provide a conceptual 'placeName' and a 'searchQuery' suitable for APIs.
-Return ONLY a JSON object matching the LLMSuggestionsOutputSchema.
-Example:
-{
-  "suggestions": [
-    {"placeName": "Fancy Dinner Spot", "searchQuery": "fine dining restaurants near me"},
-    {"placeName": "Quick Coffee", "searchQuery": "best independent coffee shops"},
-    {"placeName": "Park for a Walk", "searchQuery": "parks with walking trails"}
-  ]
-}`,
-  tools: [], // No tools for this initial suggestion step
-  model: 'gemini-pro' // Specify model if not globally set in genkit_config or if you want to override
-});
-
-export const imageSuggestionPrompt = ai.definePrompt({
-  name: 'imageSuggestionPrompt',
-  input: {
-    schema: z.object({
-      imageInputUri: z.string().url(),
-      latitude: z.number(),
-      longitude: z.number(),
-    }),
-  },
-  output: { schema: LLMSuggestionsOutputSchema },
-  system: "You are an AI assistant that analyzes an image and suggests 3-5 diverse and relevant search queries for finding local places related to the image content and user's location. Focus on variety and potential user intent.",
-  prompt: `Image input: {{media url=imageInputUri}}
-User's current location: Latitude {{{latitude}}}, Longitude {{{longitude}}}
-
-Based on this, provide 3-5 diverse search queries. For each, provide a conceptual 'placeName' and a 'searchQuery' suitable for APIs.
-Return ONLY a JSON object matching the LLMSuggestionsOutputSchema.
-Example if image shows a fancy meal:
-{
-  "suggestions": [
-    {"placeName": "Similar High-End Restaurant", "searchQuery": "gourmet restaurants with tasting menus"},
-    {"placeName": "Place for Special Occasions", "searchQuery": "romantic restaurants for anniversaries"},
-    {"placeName": "Cocktail Bar Nearby", "searchQuery": "upscale cocktail bars"}
-  ]
-}`,
-  tools: [], // No tools for this initial suggestion step
-  model: 'gemini-pro' // Or appropriate vision model like gemini-pro-vision, if needed for image input
-});
-
-
-// Main exported function
+// Main function
 export async function analyzeInputAndSuggestLocations(
   input: AnalyzeInputAndSuggestLocationsInput
 ): Promise<AnalyzeInputAndSuggestLocationsOutput> {
-  AnalyzeInputAndSuggestLocationsInputSchema.parse(input); // Validate input
-  console.log('[Flow Entry] Starting analyzeInputAndSuggestLocations with input:', JSON.stringify(input, null, 2).substring(0, 500));
-  // Directly call and return the result of the Genkit flow
-  // The Genkit flow itself handles the core logic.
-  return analyzeInputAndSuggestLocationsFlow.run(input, { 
-    // You can pass additional context or options here if needed for the flow runner
-    // For example, if you have specific tracing or auth context to inject.
-  }); 
-}
+  try {
+    console.log("[Flow] Starting with input type:", input.inputType);
 
-// The Genkit flow will be added in the next step.
+    // Step 1: Get suggestions from LLM
+    let llmSuggestions: LLMSuggestionsOutput;
+
+    if (input.inputType === "text" && input.textInput) {
+      llmSuggestions = await getTextSuggestions(
+        input.textInput,
+        input.latitude,
+        input.longitude
+      );
+    } else if (input.inputType === "image" && input.imageInputUri) {
+      llmSuggestions = await getImageSuggestions(
+        input.imageInputUri,
+        input.latitude,
+        input.longitude
+      );
+    } else {
+      return { locations: [] };
+    }
+
+    if (!llmSuggestions?.suggestions?.length) {
+      console.log("[Flow] No suggestions from LLM");
+      return { locations: [] };
+    }
+
+    console.log(`[Flow] Got ${llmSuggestions.suggestions.length} suggestions from LLM`);
+
+    // Step 2: Fetch details from all sources
+    const allResults: PlaceDetails[] = [];
+
+    for (const suggestion of llmSuggestions.suggestions) {
+      console.log(`[Flow] Processing suggestion: ${suggestion.searchQuery}`);
+
+      // Fetch from all available sources in parallel
+      const promises: Promise<PlaceDetails | null>[] = [];
+
+      if (googlePlacesApiKey.value()) {
+        promises.push(fetchPlaceDetailsFromGoogle(
+          suggestion.searchQuery,
+          input.latitude,
+          input.longitude
+        ));
+      }
+
+      if (foursquareApiKey.value()) {
+        promises.push(fetchPlaceDetailsFromFoursquare(
+          suggestion.searchQuery,
+          input.latitude,
+          input.longitude
+        ));
+      }
+
+      if (tripAdvisorApiKey.value()) {
+        promises.push(fetchPlaceDetailsFromTripAdvisor(
+          suggestion.searchQuery,
+          input.latitude,
+          input.longitude
+        ));
+      }
+
+      if (zomatoApiKey.value() && suggestion.searchQuery.toLowerCase().includes("restaurant")) {
+        promises.push(fetchPlaceDetailsFromZomato(
+          suggestion.searchQuery,
+          input.latitude,
+          input.longitude
+        ));
+      }
+
+      const results = await Promise.all(promises);
+      const validResults = results.filter((r): r is PlaceDetails => r !== null);
+      allResults.push(...validResults);
+    }
+
+    // Step 3: Deduplicate results
+    const deduplicatedLocations = deduplicateLocations(allResults);
+
+    console.log(`[Flow] Returning ${deduplicatedLocations.length} unique locations`);
+    return { locations: deduplicatedLocations };
+  } catch (error) {
+    console.error("[analyzeInputAndSuggestLocations] Error:", error);
+    throw error;
+  }
+}

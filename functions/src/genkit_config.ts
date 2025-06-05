@@ -1,31 +1,33 @@
 // functions/src/genkit_config.ts
-import { genkit, configureGenkit } from '@genkit-ai/core';
-import { googleAI } from '@genkit-ai/googleai';
-import { firebase } from '@genkit-ai/firebase'; // Recommended for Firebase environment
+import { genkit } from '@genkit-ai/core';
+import { googleAI } from '@genkit-ai/google-ai';
+import { firebase } from '@genkit-ai/firebase'; // Recommended for Firebase environment for logging/tracing
 
-// The googleAI plugin typically checks for GOOGLE_API_KEY or GEMINI_API_KEY in process.env.
-// Ensure this key is set in your Firebase Functions environment variables.
-const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+// The googleAI plugin, when initialized with no specific apiKey, 
+// will look for GEMINI_API_KEY or GOOGLE_API_KEY in process.env.
+// Ensure this is set in your Firebase Functions environment configuration.
 
-const genkitPlugins = [
-  firebase(), // For logging, flow state management, and auth context if needed
-];
-
-if (apiKey) {
-  genkitPlugins.push(googleAI({ apiKey: apiKey })); 
-  console.log("[Genkit Config] Google AI plugin configured WITH an explicit API key.");
-} else {
-  genkitPlugins.push(googleAI());
-  console.warn("[Genkit Config] GEMINI_API_KEY or GOOGLE_API_KEY not found in environment. Initializing Google AI plugin without explicit API key.");
-}
-
-configureGenkit({
-  plugins: genkitPlugins,
+export const ai = genkit({
+  plugins: [
+    googleAI(), // Initializes Google AI with API key from environment variables
+    firebase(), // Integrates Firebase for better logging, tracing, flow state in Firebase environment
+  ],
+  // Set a default model for this Genkit instance.
+  // Prompts/flows can override this if they specify a different model.
+  // Your original code had 'googleai/gemini-2.0-flash'. 
+  // Standard Genkit model names are usually simpler, e.g., 'gemini-1.5-flash-latest' or 'gemini-pro'.
+  // We will use 'gemini-1.5-flash-latest' here. Adjust if you have a specific reason for the other format.
+  defaultModel: 'gemini-1.5-flash-latest',
+  
+  // Optional: Explicitly configure stores to use Firebase in this environment if not defaulted by the firebase plugin.
   flowStateStore: 'firebase', 
-  traceStore: 'firebase',     
-  defaultModel: 'gemini-1.5-flash-latest', // Corrected default model name for Genkit Google AI plugin
-  logLevel: process.env.NODE_ENV === 'production' ? 'warn' : 'debug',
-  enableTracingAndMetrics: true, 
+  traceStore: 'firebase',
+  
+  // Configure logging level for Genkit.
+  logLevel: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  // Metrics and tracing are useful, especially during development.
+  enableTracingAndMetrics: true,
 });
 
-export { genkit as ai };
+// Corrected console log to refer to the 'ai' instance itself or a general message.
+console.log('[Genkit Config] Genkit 'ai' instance has been configured.');

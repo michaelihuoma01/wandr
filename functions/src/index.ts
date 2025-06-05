@@ -1,72 +1,114 @@
 // functions/src/index.ts
-import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
-import { analyzeInputAndSuggestLocations, AnalyzeInputAndSuggestLocationsInput } from "./search_logic"; // Import your core logic
+import { onRequest } from "firebase-functions/v2/https";
 import { defineString } from "firebase-functions/params";
+import * as admin from "firebase-admin";
+import cors from "cors"
 
-// Initialize Firebase Admin SDK (if you use other Firebase services like Firestore, Storage, etc., in this function)
-// If not, for a simple HTTP function like this, it might not be strictly necessary unless other Firebase services are used.
+import { 
+  analyzeInputAndSuggestLocations, 
+  AnalyzeInputAndSuggestLocationsInput,
+  AnalyzeInputAndSuggestLocationsOutput 
+} from "./analyze_input_flow";
+
+// Initialize Firebase Admin SDK
 admin.initializeApp();
 
-// Define API key parameters. These names MUST match what you set in Firebase environment configuration.
-const googlePlacesApiKey = defineString("GOOGLE_PLACES_API_KEY");
-const foursquareApiKey = defineString("FOURSQUARE_API_KEY");
-const geminiApiKey = defineString("GEMINI_API_KEY"); // Define if you plan to use Gemini directly in search_logic
+// Define parameters for API keys
+export const googlePlacesApiKey = defineString("GOOGLE_PLACES_API_KEY");
+export const foursquareApiKey = defineString("FOURSQUARE_API_KEY");
+export const geminiApiKey = defineString("GEMINI_API_KEY");
+export const tripAdvisorApiKey = defineString("TRIPADVISOR_API_KEY");
+export const zomatoApiKey = defineString("ZOMATO_API_KEY");
 
-export const searchPlaces = functions.https.onRequest(async (request, response) => {
-  // Set CORS headers to allow requests from your app (or any origin with '*')
-  response.set('Access-Control-Allow-Origin', '*'); // Be more specific in production if needed
-  response.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  response.set('Access-Control-Allow-Headers', 'Content-Type, Authorization'); // Allow Authorization if you plan to use it
-  response.set('Access-Control-Max-Age', '3600');
+// Initialize CORS
+const corsHandler = cors({ origin: true });
 
-  // Handle preflight OPTIONS request for CORS
-  if (request.method === 'OPTIONS') {
-    response.status(204).send('');
-    return;
-  }
-
-  // Only allow POST requests for this function
-  if (request.method !== 'POST') {
-    response.status(405).send('Method Not Allowed. Please use POST.');
-    return;
-  }
-
-  try {
-    // The request body should contain the input data for your search logic
-    const input = request.body as AnalyzeInputAndSuggestLocationsInput;
-
-    // Basic validation (you might want to use a library like Zod here too if not done in search_logic.ts)
-    if (!input || typeof input.latitude !== 'number' || typeof input.longitude !== 'number' || !input.inputType) {
-         response.status(400).send('Invalid input format. Required fields: inputType, latitude, longitude, and textInput or imageInputUri.');
-         return;
+// Main search endpoint
+export const searchPlaces = onRequest(
+  {
+    timeoutSeconds: 60,
+    memory: "1GiB",
+    cors: true,
+  },
+  async (request, response) => {
+    // Only allow POST requests
+    if (request.method !== "POST") {
+      response.status(405).json({ error: "Method not allowed. Use POST." });
+      return;
     }
-    if (input.inputType === 'text' && !input.textInput) {
-        response.status(400).send('Invalid input: textInput is required for text inputType.');
+
+    try {
+      // Parse request body
+      const input = request.body as AnalyzeInputAndSuggestLocationsInput;
+
+      // Validate input
+      if (!input || typeof input.latitude !== "number" || typeof input.longitude !== "number" || !input.inputType) {
+        response.status(400).json({
+          error: "Invalid input format",
+          details: "Required fields: inputType, latitude, longitude, and textInput or imageInputUri"
+        });
         return;
-    }
-    if (input.inputType === 'image' && !input.imageInputUri) {
-        response.status(400).send('Invalid input: imageInputUri is required for image inputType.');
-        return;
-    }
+      }
 
-    // Retrieve API keys from environment variables
-    const apiKeysToPass = {
-      googleApiKey: googlePlacesApiKey.value(),
-      foursquareApiKey: foursquareApiKey.value(),
-      geminiApiKey: geminiApiKey.value(), // Pass Gemini key if needed by search_logic
+      if (input.inputType === "text" && !input.textInput) {
+        response.status(400).json({
+          error: "textInput is required for text inputType"
+        });
+        return;
+      }
+
+      if (input.inputType === "image" && !input.imageInputUri) {
+        response.status(400).json({
+          error: "imageInputUri is required for image inputType"
+        });
+        return;
+      }
+
+      console.log("[Index] Processing search request:", {
+        inputType: input.inputType,
+        latitude: input.latitude,
+        longitude: input.longitude,
+        textInput: input.textInput?.substring(0, 50)
+      });
+
+      // Call the main flow
+      const results = await analyzeInputAndSuggestLocations(input);
+
+      console.log(`[Index] Successfully processed request. Found ${results.locations.length} locations`);
+      response.status(200).json(results);
+
+    } catch (error: any) {
+      console.error("[Index] Error processing request:", error);
+      
+      // Send a more informative error response
+      response.status(500).json({
+        error: "Failed to process search request",
+        details: error.message || "An unknown error occurred"
+      });
+    }
+  }
+);
+
+// Health check endpoint
+export const healthCheck = onRequest(
+  { cors: true },
+  async (request, response) => {
+    const apiKeysStatus = {
+      googlePlaces: !!googlePlacesApiKey.value(),
+      foursquare: !!foursquareApiKey.value(),
+      gemini: !!geminiApiKey.value(),
+      tripAdvisor: !!tripAdvisorApiKey.value(),
+      zomato: !!zomatoApiKey.value(),
     };
 
-    console.log("[Index] Calling analyzeInputAndSuggestLocations with input:", JSON.stringify(input).substring(0,300));
-    // Pass the API keys to your core logic
-    const results = await analyzeInputAndSuggestLocations(input, apiKeysToPass);
-
-    console.log("[Index] Sending results:", JSON.stringify(results).substring(0,300));
-    response.status(200).json(results);
-
-  } catch (error: any) {
-    console.error("[Index] Error processing search request:", error.message, error.stack);
-    // It's good to log the error but be careful about sending detailed internal errors to the client.
-    response.status(500).send("An internal error occurred while processing your request.");
+    response.status(200).json({
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      apiKeys: apiKeysStatus,
+      version: "1.0.0"
+    });
   }
-});
+);
+
+// Re-export the photo proxy functions from photo_proxy.ts
+export { proxyPlacePhoto, getResolvedPhotoUrl } from "./photo_proxy";
