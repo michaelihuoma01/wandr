@@ -2,12 +2,12 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { defineString } from "firebase-functions/params";
 import * as admin from "firebase-admin";
-import cors from "cors"
+// import cors from "cors"
 
 import { 
   analyzeInputAndSuggestLocations, 
   AnalyzeInputAndSuggestLocationsInput,
-  AnalyzeInputAndSuggestLocationsOutput 
+  // AnalyzeInputAndSuggestLocationsOutput 
 } from "./analyze_input_flow";
 
 // Initialize Firebase Admin SDK
@@ -21,7 +21,7 @@ export const tripAdvisorApiKey = defineString("TRIPADVISOR_API_KEY");
 export const zomatoApiKey = defineString("ZOMATO_API_KEY");
 
 // Initialize CORS
-const corsHandler = cors({ origin: true });
+// const corsHandler = cors({ origin: true });
 
 // Main search endpoint
 export const searchPlaces = onRequest(

@@ -1,22 +1,103 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart'; // Import the home screen
+import 'package:flutter/services.dart';
+import 'home_screen.dart';
 
 void main() {
-  runApp(const MyApp()); // Added const
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Set system UI overlay style
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
+  
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key}); // Added const constructor
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Vibe Search App',
+      title: 'Wandr - AI Place Discovery',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true, // Optional: enable Material 3
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF6200EE), // Purple theme
+          brightness: Brightness.light,
+        ),
+        primaryColor: const Color(0xFF6200EE),
+        useMaterial3: true,
+        fontFamily: 'SF Pro Display', // Uses system font
+        
+        // Custom text theme
+        textTheme: const TextTheme(
+          headlineLarge: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -1.0,
+          ),
+          headlineMedium: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.5,
+          ),
+          bodyLarge: TextStyle(
+            fontSize: 16,
+            height: 1.5,
+          ),
+          bodyMedium: TextStyle(
+            fontSize: 14,
+            height: 1.5,
+          ),
+        ),
+        
+        // Button theme
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        
+        // Input decoration theme
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.grey[100],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: const Color(0xFF6200EE).withOpacity(0.5),
+              width: 2,
+            ),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
+        ),
+        
+        // App bar theme
+        appBarTheme: const AppBarTheme(
+          elevation: 0,
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          systemOverlayStyle: SystemUiOverlayStyle.dark,
+        ),
       ),
-      home: const HomeScreen(), // Set HomeScreen as the home, added const
+      home: const HomeScreen(),
     );
   }
 }

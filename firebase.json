@@ -5,29 +5,13 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "default",
-      "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" run build"
-      ]
-    },
-    {
-      "source": "indexdemo",
-      "codebase": "indexdemo",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        "*.local"
-      ],
-      "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" run build"
-      ]
-    }
-  ],
+  "functions": {
+    "source": "functions",
+    "codebase": "default",
+    "predeploy": [
+      "npm --prefix \"$RESOURCE_DIR\" run build"
+    ]
+  },
   "storage": {
     "rules": "storage.rules"
   },

@@ -25,6 +25,7 @@ function getGenAI() {
   return genAI;
 }
 
+// const placeholderImage = "https://placehold.co/600x400.png";
 
 // Type definitions
 export interface PlaceDetails {
@@ -79,20 +80,24 @@ async function getTextSuggestions(
 ): Promise<LLMSuggestionsOutput> {
   const model = getGenAI().getGenerativeModel({ model: "gemini-1.5-flash" });
   
+  console.log(`[LLM] Getting suggestions for text: "${textInput}" at location: ${latitude}, ${longitude}`);
+  
   const prompt = `
 You are an AI assistant that suggests diverse and relevant search queries for finding local places based on user input.
 
 User's text input: "${textInput}"
 User's location: Latitude ${latitude}, Longitude ${longitude}
 
-Based on this, provide 3-5 diverse search queries for finding local places.
+Based on this, provide 3-5 diverse search queries for finding local places NEAR THE USER'S LOCATION.
+Make sure to include location-aware search terms in your queries.
+
 Return ONLY a valid JSON object with suggestions array, each containing placeName and searchQuery.
 
 Example format:
 {
   "suggestions": [
-    {"placeName": "Cozy Coffee Shop", "searchQuery": "artisan coffee shops near me"},
-    {"placeName": "Pet-Friendly Restaurant", "searchQuery": "dog friendly restaurants"}
+    {"placeName": "Cozy Coffee Shop", "searchQuery": "artisan coffee shops near ${latitude},${longitude}"},
+    {"placeName": "Pet-Friendly Restaurant", "searchQuery": "dog friendly restaurants nearby"}
   ]
 }
 
@@ -115,8 +120,8 @@ Return only the JSON, no additional text.`;
     // Fallback suggestions
     return {
       suggestions: [
-        { placeName: "Nearby Places", searchQuery: `${textInput} near me` },
-        { placeName: "Popular Spots", searchQuery: `best ${textInput}` },
+        { placeName: "Nearby Places", searchQuery: `${textInput} near ${latitude},${longitude}` },
+        { placeName: "Popular Spots", searchQuery: `best ${textInput} nearby` },
         { placeName: "Local Favorites", searchQuery: `top rated ${textInput}` }
       ]
     };
@@ -200,21 +205,32 @@ async function fetchPlaceDetailsFromGoogle(
   }
 
   try {
-    // Text search
+    console.log(`[Google Tool] Searching for "${searchQuery}" near ${latitude},${longitude}`);
+    
+    // Text search with explicit location bias
     const searchUrl = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
     searchUrl.searchParams.append("query", searchQuery);
     searchUrl.searchParams.append("location", `${latitude},${longitude}`);
-    searchUrl.searchParams.append("radius", "20000");
+    searchUrl.searchParams.append("radius", "20000"); // 20km radius
+    searchUrl.searchParams.append("locationbias", `circle:20000@${latitude},${longitude}`); // Add location bias
     searchUrl.searchParams.append("key", apiKey);
 
     const searchResponse = await fetch(searchUrl.toString());
-    if (!searchResponse.ok) return null;
+    if (!searchResponse.ok) {
+      console.error(`[Google Tool] Search failed: ${searchResponse.status}`);
+      return null;
+    }
     
     const searchData = await searchResponse.json();
-    if (!searchData.results || searchData.results.length === 0) return null;
+    if (!searchData.results || searchData.results.length === 0) {
+      console.log(`[Google Tool] No results found for "${searchQuery}"`);
+      return null;
+    }
     
     const foundPlace = searchData.results[0];
     const placeId = foundPlace.place_id;
+    
+    console.log(`[Google Tool] Found place: ${foundPlace.name} (${foundPlace.formatted_address})`);
 
     // Get details
     const detailsUrl = new URL("https://maps.googleapis.com/maps/api/place/details/json");
@@ -423,7 +439,13 @@ export async function analyzeInputAndSuggestLocations(
   input: AnalyzeInputAndSuggestLocationsInput
 ): Promise<AnalyzeInputAndSuggestLocationsOutput> {
   try {
-    console.log("[Flow] Starting with input type:", input.inputType);
+    console.log("[Flow] Starting with input:", {
+      type: input.inputType,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      searchRadius: input.searchRadius,
+      query: input.textInput?.substring(0, 50)
+    });
 
     // Step 1: Get suggestions from LLM
     let llmSuggestions: LLMSuggestionsOutput;

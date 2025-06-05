@@ -96,7 +96,7 @@ export const getResolvedPhotoUrl = functions.https.onRequest((req, res) => {
       return;
     }
 
-    const { photoReference, maxWidth, maxHeight } = req.query as PhotoProxyQuery;
+    const { photoReference, maxWidth } = req.query as PhotoProxyQuery;
     const apiKey = googlePlacesApiKey.value();
 
     if (!photoReference || !apiKey) {
