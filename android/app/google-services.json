@@ -1,6 +1,8 @@
+
 {
   "project_info": {
     "project_number": "248207776942",
+    "firebase_url": "https://locale-lens-uslei-default-rtdb.asia-southeast1.firebasedatabase.app",
     "project_id": "locale-lens-uslei",
     "storage_bucket": "locale-lens-uslei.firebasestorage.app"
   },
@@ -12,7 +14,12 @@
           "package_name": "com.michaelihuoma.wandr"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "248207776942-8pm3gkbv3ckurvjo6tasls1iaf6jc630.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAg2DE8DzvbqUmHhY1e7ACO2JN9DIn2K04"
@@ -20,7 +27,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "248207776942-8pm3gkbv3ckurvjo6tasls1iaf6jc630.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "248207776942-v3v3ejqgi5ho659urk3iqi9l3rno0b7t.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.michaelihuoma.wandr"
+              }
+            }
+          ]
         }
       }
     }

@@ -40,7 +40,11 @@ dependencies:
   cached_network_image: ^3.3.1
   url_launcher: ^6.2.4
   shared_preferences: ^2.2.3
+  geocoding: ^3.0.0 # Added geocoding
   intl: ^0.19.0
+  firebase_auth: ^4.19.0 # Added firebase_auth
+  google_sign_in: ^6.2.1 # Added google_sign_in
+  cloud_firestore: ^4.17.0
 
 dev_dependencies:
   flutter_test:

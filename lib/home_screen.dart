@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:myapp/welcome_screen.dart';
 import 'dart:convert';
 import 'models.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,6 +26,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _isLoading = false;
   String? _errorMessage;
   Position? _currentPosition;
+  double _searchRadius = 20.0; // Default search radius in km
+  String _currentCity = 'Fetching location...';
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
@@ -30,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   static const String _cloudFunctionUrl = 'https://searchplaces-sk572tzuuq-uc.a.run.app'; // <<<--- IMPORTANT: REPLACE THIS URL
   // static const String _cloudFunctionUrl = 'http://localhost:5001/locale-lens-uslei/us-central1/searchPlaces'; // <<<--- IMPORTANT: REPLACE THIS URL
   static const String _photoProxyUrl = 'https://proxyplacephoto-sk572tzuuq-uc.a.run.app';
-
+  String _userName = 'Loading...'; 
 
   @override
   void initState() {
@@ -45,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
     _loadSearchHistory();
     _getCurrentLocation();
+    _fetchUserName();
   }
 
   @override
@@ -52,6 +58,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _animationController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchUserName() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        setState(() {
+          _userName = userDoc.data()?['name'] ?? 'User'; // Fetch name or use 'User' as fallback
+        });
+      } else {
+        setState(() {
+          _userName = user.displayName ?? 'User'; // Use Google Display Name as fallback
+        });
+      }
+    } else {
+       setState(() {
+          _userName = 'Guest'; // Display 'Guest' if no user is signed in
+       });
+    }
   }
 
   Future<void> _loadSearchHistory() async {
@@ -126,6 +152,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _errorMessage = null;
       });
       
+      try {
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+          position.latitude, position.longitude);
+        _currentCity = placemarks.first.locality ?? 'Unknown City';
+      } catch (e) {
+        _currentCity = 'Could not get city name';
+      }
+      
       print('Current location: ${position.latitude}, ${position.longitude}');
     } catch (e) {
       setState(() {
@@ -172,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           'inputType': 'text',
           'latitude': _currentPosition!.latitude,
           'longitude': _currentPosition!.longitude,
-          'searchRadius': 20000,
+ 'searchRadius': _searchRadius * 1000, // Convert km to meters
         }),
       ).timeout(const Duration(seconds: 30));
 
@@ -297,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 if (place.imageUrls != null && place.imageUrls!.isNotEmpty)
                   Stack(
                     children: [
-                      Container(
+                      SizedBox(
                         height: 220,
                         child: PageView.builder(
                           itemCount: place.imageUrls!.length,
@@ -709,127 +743,176 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
+        appBar: AppBar( // Add this AppBar
+        title: Text('Wandr'), // You can keep the app title here or in the header as before
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              // Navigate back to the WelcomeScreen and remove all previous routes
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => WelcomeScreen()),
+                (Route<dynamic> route) => false,
+              );
+            },
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
             // Header
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
+Container(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 0), // Adjust padding as AppBar adds space
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
               ),
-              child: Column(
+            ],
+          ),
+          child: Column(
+            children: [
+               Row(
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Wandr',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).primaryColor,
-                          letterSpacing: -1,
-                        ),
+                  Expanded( // Use Expanded to allow the text to take available space
+                    child: Text(
+                      'Welcome, $_userName', // Display fetched user name
+                      style: TextStyle(
+                        fontSize: 24, // Adjust font size as needed
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).primaryColor,
+                        letterSpacing: -1,
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).primaryColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'AI Powered',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Theme.of(context).primaryColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  if (_currentPosition != null)
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          size: 14,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Location: ${_currentPosition!.latitude.toStringAsFixed(4)}, ${_currentPosition!.longitude.toStringAsFixed(4)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
+                       overflow: TextOverflow.ellipsis, // Prevent overflow
                     ),
-                  const SizedBox(height: 20),
-                  
-                  // Search Bar
-                  Container(
+                  ),
+                   const SizedBox(width: 8),
+                   Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.grey[200]!,
-                        width: 1,
-                      ),
+                      color: Theme.of(context).primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Try "pet friendly cafes" or "romantic dinner"',
-                        hintStyle: TextStyle(color: Colors.grey[500]),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.search,
-                          color: Colors.grey[600],
-                        ),
-                        suffixIcon: _isLoading
-                            ? const Padding(
-                                padding: EdgeInsets.all(12),
-                                child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              )
-                            : IconButton(
-                                icon: Icon(
-                                  Icons.arrow_forward_ios,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                                onPressed: _performSearch,
-                              ),
+                    child: Text(
+                      'AI Powered',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Theme.of(context).primaryColor,
+                        fontWeight: FontWeight.w600,
                       ),
-                      onSubmitted: (_) => _performSearch(),
                     ),
                   ),
-                  const SizedBox(height: 20),
                 ],
+               ),
+               const SizedBox(height: 4),
+              if (_currentPosition != null)
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on,
+                      size: 14,
+                      color: Colors.grey[600],
+                    ),
+                    const SizedBox(width: 4),
+                    Text(_currentCity,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+               const SizedBox(height: 20),
+
+              // Search Bar
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.grey[200]!,
+                    width: 1,
+                  ),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Try \"pet friendly cafes\" or \"romantic dinner\"',
+                    hintStyle: TextStyle(color: Colors.grey[500]),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: Colors.grey[600],
+                    ),
+                    suffixIcon: _isLoading
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          )
+                        : IconButton(
+                            icon: Icon(
+                              Icons.arrow_forward_ios,
+                              color: Theme.of(context).primaryColor,
+                            ),
+                            onPressed: _performSearch,
+                          ),
+                  ),
+                  onSubmitted: (_) => _performSearch(),
+                ),
               ),
-            ),
+             const SizedBox(height: 12),
+             // Distance Slider
+              Row(
+               children: [
+                Text(
+                  'Search Radius: ${_searchRadius.toStringAsFixed(0)} km',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[700],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Expanded(
+                  child: Slider(
+                    value: _searchRadius,
+                    min: 1,
+                    max: 50,
+                    divisions: 49, // For steps of 1 km
+                    label: _searchRadius.toStringAsFixed(0),
+                    onChanged: (double value) {
+                      setState(() {
+                        _searchRadius = value;
+                      });
+                    },
+                    activeColor: Theme.of(context).primaryColor,
+                  ),
+                ),
+               ],
+              ),
+              const SizedBox(height: 20), // Add spacing below slider
+            ],
+          ),
+        ),
+        // ... rest of your body content (error message, results/history)
             
             // Error message
             if (_errorMessage != null)
