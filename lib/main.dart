@@ -8,18 +8,23 @@ import 'profile_setup_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  
+  await Firebase.initializeApp(
+      options: FirebaseOptions(
+          apiKey: "AIzaSyAg2DE8DzvbqUmHhY1e7ACO2JN9DIn2K04",
+          appId: "1:248207776942:ios:f27fee07f5a6aff9f5e13f",
+          messagingSenderId: "248207776942",
+          projectId: "locale-lens-uslei"));
+
   // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(
-     const SystemUiOverlayStyle(
+    const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
       systemNavigationBarColor: Colors.white,
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
-  
+
   runApp(const MyApp());
 }
 
@@ -31,7 +36,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       initialRoute: '/',
       routes: {
-        '/': (context) => const HomeScreen(), // Assuming HomeScreen is your initial signed-in route
+        '/': (context) =>
+            const HomeScreen(), // Assuming HomeScreen is your initial signed-in route
         '/profileSetup': (context) => const ProfileSetupScreen(),
       },
       title: 'Wandr - AI Place Discovery',
@@ -44,7 +50,7 @@ class MyApp extends StatelessWidget {
         primaryColor: const Color(0xFF6200EE),
         useMaterial3: true,
         fontFamily: 'SF Pro Display', // Uses system font
-        
+
         // Custom text theme
         textTheme: const TextTheme(
           headlineLarge: TextStyle(
@@ -66,7 +72,7 @@ class MyApp extends StatelessWidget {
             height: 1.5,
           ),
         ),
-        
+
         // Button theme
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
@@ -77,7 +83,7 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        
+
         // Input decoration theme
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
@@ -98,7 +104,7 @@ class MyApp extends StatelessWidget {
             vertical: 16,
           ),
         ),
-        
+
         // App bar theme
         appBarTheme: const AppBarTheme(
           elevation: 0,

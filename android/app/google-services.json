@@ -9,7 +9,7 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:248207776942:android:764ecd4d3b547a9af5e13f",
+        "mobilesdk_app_id": "1:248207776942:android:764ecd4d3b547a9af5e13f", 
         "android_client_info": {
           "package_name": "com.michaelihuoma.wandr"
         }

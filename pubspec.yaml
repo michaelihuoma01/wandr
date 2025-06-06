@@ -35,16 +35,16 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8 # I see you have 1.0.8, will keep it
   http: ^1.2.1 # Added http
-  geolocator: ^12.0.0 # Added geolocator
+  geolocator: ^13.0.4 # Added geolocator
   json_annotation: ^4.9.0 # Added json_annotation
   cached_network_image: ^3.3.1
   url_launcher: ^6.2.4
   shared_preferences: ^2.2.3
-  geocoding: ^3.0.0 # Added geocoding
-  intl: ^0.19.0
-  firebase_auth: ^4.19.0 # Added firebase_auth
+  geocoding: ^4.0.0 # Added geocoding
+  intl: ^0.20.2
+  firebase_auth: ^5.5.4 # Added firebase_auth
   google_sign_in: ^6.2.1 # Added google_sign_in
-  cloud_firestore: ^4.17.0
+  cloud_firestore: ^5.6.8
 
 dev_dependencies:
   flutter_test:
@@ -55,7 +55,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^4.0.0 # Assuming you want to keep up with latest, or I can use your existing version if you specify
+  flutter_lints: ^5.0.0 # Assuming you want to keep up with latest, or I can use your existing version if you specify
   build_runner: ^2.4.10 # Added build_runner
   json_serializable: ^6.8.0 # Added json_serializable
 
