@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/screens/history_screen.dart';
 
-import '../../models.dart';
+import '../models/models.dart';
 import '../../services/auth_service.dart';
 import '../../services/location_service.dart';
 import '../../services/search_service.dart';

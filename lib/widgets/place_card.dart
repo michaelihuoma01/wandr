@@ -2,8 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:myapp/widgets/check_in_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../models.dart';
+import '../models/models.dart';
 
 class PlaceCard extends StatelessWidget {
   final PlaceDetails place;
@@ -337,7 +338,26 @@ class PlaceCard extends StatelessWidget {
   }
 
   Widget _buildActions(BuildContext context) {
-    return Row(
+    return Column(
+      children: [
+        // Check-in button
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _showCheckInDialog(context),
+            icon: const Icon(Icons.location_on, size: 18),
+            label: const Text('Check In'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12), Row(
       children: [
         Expanded(
           child: ElevatedButton.icon(
@@ -378,6 +398,14 @@ class PlaceCard extends StatelessWidget {
             ),
           ),
       ],
+    )
+      ]);
+  }
+
+    void _showCheckInDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => CheckInDialog(place: place),
     );
   }
 

@@ -25,8 +25,17 @@ void main() async {
     ),
   );
 
+    // Initialize background service
+  await initializeBackgroundService();
+
   runApp(const MyApp());
 }
+
+  Future<void> initializeBackgroundService() async {
+    // Configure background service for location tracking
+    // Implementation depends on chosen background service package
+  }
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 

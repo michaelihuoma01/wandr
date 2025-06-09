@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models.dart';
+import '../models/models.dart';
 
 class SearchService {
   static const String _cloudFunctionUrl = 'https://searchplaces-sk572tzuuq-uc.a.run.app';

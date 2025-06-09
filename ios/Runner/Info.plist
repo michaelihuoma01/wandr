@@ -64,5 +64,20 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Wandr needs your location to discover amazing places near you</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Wandr can track places you visit to build your personal journey map</string>
+
+	<!-- Background modes for location tracking -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+	</array>
+
+	<!-- Google Maps API Key -->
+	<key>GMSApiKey</key>
+	<string>AIzaSyBm3Am2fZKUkTfgzdRRB6pgQACB9x4Ywqw</string>
 </dict>
 </plist>
