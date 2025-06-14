@@ -38,18 +38,45 @@ class SearchHistoryItem extends StatelessWidget {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Theme.of(context).primaryColor.withOpacity(0.1),
+          color: history.isImageSearch 
+            ? Colors.purple.withOpacity(0.1)
+            : Theme.of(context).primaryColor.withOpacity(0.1),
           shape: BoxShape.circle,
         ),
         child: Icon(
-          Icons.history,
-          color: Theme.of(context).primaryColor,
+          history.isImageSearch ? Icons.image : Icons.history,
+          color: history.isImageSearch 
+            ? Colors.purple
+            : Theme.of(context).primaryColor,
           size: 20,
         ),
       ),
-      title: Text(
-        history.query,
-        style: const TextStyle(fontWeight: FontWeight.w500),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              history.query,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+          if (history.isImageSearch)
+            Container(
+              margin: const EdgeInsets.only(left: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.purple[50],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Image',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.purple[700],
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+        ],
       ),
       subtitle: Text(
         '$timeAgo • ${history.resultCount} results',
@@ -59,7 +86,7 @@ class SearchHistoryItem extends StatelessWidget {
         ),
       ),
       trailing: const Icon(Icons.north_west, size: 16),
-      onTap: onTap,
+      onTap: history.isImageSearch ? null : onTap, // Disable tap for image searches
     );
   }
 }

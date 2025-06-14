@@ -1,13 +1,18 @@
 // lib/screens/home_screen.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:myapp/models/models.dart';
 import 'package:myapp/screens/history_screen.dart';
+import 'package:myapp/screens/visit_history_screen.dart';
 
-import '../models/models.dart';
-import '../../services/auth_service.dart';
-import '../../services/location_service.dart';
-import '../../services/search_service.dart';
-import '../../widgets/place_card.dart';
-import '../../widgets/search_history_item.dart';
+import '../services/auth_service.dart';
+import '../services/location_service.dart';
+import '../services/search_service.dart';
+import '../services/visit_service.dart';
+import '../widgets/place_card.dart';
+import '../widgets/search_history_item.dart';
+import '../widgets/search_filter_sheet.dart';
 import 'welcome_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -22,6 +27,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final AuthService _authService = AuthService();
   final LocationService _locationService = LocationService();
   final SearchService _searchService = SearchService();
+  final VisitService _visitService = VisitService();
+  final ImagePicker _imagePicker = ImagePicker();
 
   // Controllers
   final TextEditingController _searchController = TextEditingController();
@@ -30,15 +37,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // State variables
   List<PlaceDetails> _searchResults = [];
+  List<PlaceDetails> _filteredResults = [];
   List<SearchHistory> _recentSearches = [];
   bool _isLoading = false;
   String? _errorMessage;
   String _userName = 'User';
-  double _searchRadius = 20.0; // km
+  double _searchRadius = 25.0; // km - default 25km for better coverage
   String? _currentQuery;
   int _currentPage = 0;
   bool _hasMoreResults = false;
   bool _isLoadingMore = false;
+  int _selectedIndex = 0; // For bottom navigation
+  bool _isTrackingEnabled = false;
+  File? _selectedImage;
+  bool _isImageSearch = false;
+  SearchFilter _currentFilter = SearchFilter();
 
   @override
   void initState() {
@@ -62,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     await _loadUserName();
     await _loadLocation();
     await _loadRecentSearches();
+    await _checkTrackingStatus();
   }
 
   Future<void> _loadUserName() async {
@@ -95,13 +109,49 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _checkTrackingStatus() async {
+    // Check if background tracking is enabled from preferences
+    // This is a simplified version - you'd implement proper preference storage
+    setState(() {
+      _isTrackingEnabled = false; // Default to false
+    });
+  }
+
+  Future<void> _toggleTracking() async {
+    if (_isTrackingEnabled) {
+      _visitService.stopBackgroundTracking();
+      setState(() => _isTrackingEnabled = false);
+    } else {
+      final enabled = await _visitService.startBackgroundTracking();
+      if (enabled) {
+        setState(() => _isTrackingEnabled = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Background location tracking enabled'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enable location permissions for background tracking'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _performSearch([String? historyQuery]) async {
     final query = historyQuery ?? _searchController.text;
-    if (query.isEmpty) {
+    
+    // Check if we have either text or image
+    if (query.isEmpty && _selectedImage == null) {
       setState(() {
         _searchResults = [];
         _errorMessage = null;
         _currentQuery = null;
+        _isImageSearch = false;
       });
       return;
     }
@@ -124,28 +174,57 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
     });
 
-    final result = await _searchService.searchPlaces(
-      query: query,
-      latitude: _locationService.currentPosition!.latitude,
-      longitude: _locationService.currentPosition!.longitude,
-      radiusKm: _searchRadius,
-    );
+    SearchResult result;
+    
+    if (_selectedImage != null) {
+      // Image search
+      _isImageSearch = true;
+      
+      // Upload image and get URL
+      final imageUrl = await _searchService.uploadSearchImage(_selectedImage!);
+      
+      if (imageUrl == null) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to upload image';
+        });
+        return;
+      }
+      
+      result = await _searchService.searchPlaces(
+        imageUrl: imageUrl,
+        latitude: _locationService.currentPosition!.latitude,
+        longitude: _locationService.currentPosition!.longitude,
+        radiusKm: _searchRadius,
+      );
+    } else {
+      // Text search
+      _isImageSearch = false;
+      result = await _searchService.searchPlaces(
+        query: query,
+        latitude: _locationService.currentPosition!.latitude,
+        longitude: _locationService.currentPosition!.longitude,
+        radiusKm: _searchRadius,
+      );
+    }
 
     if (mounted) {
       setState(() {
         _isLoading = false;
         if (result.success) {
           _searchResults = result.locations;
-          _currentQuery = query;
+          _applyFilters(); // Apply filters to results
+          _currentQuery = _isImageSearch ? 'Image Search' : query;
           _hasMoreResults = result.hasMore;
           _animationController.forward();
         } else {
           _errorMessage = result.error;
           _searchResults = [];
+          _filteredResults = [];
         }
       });
 
-      if (result.success) {
+      if (result.success && !_isImageSearch) {
         await _searchService.saveToHistory(
           query,
           result.totalResults,
@@ -153,8 +232,197 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _locationService.currentPosition!.longitude,
         );
         await _loadRecentSearches();
+      } else if (result.success && _isImageSearch) {
+        // Save image search to history with a descriptive query
+        await _searchService.saveToHistory(
+          'Image Search - ${DateTime.now().toLocal().toString().split(' ')[1].split('.')[0]}',
+          result.totalResults,
+          _locationService.currentPosition!.latitude,
+          _locationService.currentPosition!.longitude,
+          isImageSearch: true,
+        );
+        await _loadRecentSearches();
       }
     }
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final pickedFile = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+          _searchController.clear(); // Clear text when image is selected
+        });
+        
+        // Automatically perform search with the selected image
+        await _performSearch();
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to pick image: ${e.toString()}';
+      });
+    }
+  }
+
+  void _clearSelectedImage() {
+    setState(() {
+      _selectedImage = null;
+      _isImageSearch = false;
+      _searchResults = [];
+      _filteredResults = [];
+      _currentQuery = null;
+      _currentFilter = SearchFilter(); // Reset filters too
+    });
+  }
+
+  void _applyFilters() {
+    List<PlaceDetails> filtered = List.from(_searchResults);
+    
+    // Apply distance filter
+    if (_currentFilter.maxDistance != null) {
+      filtered = filtered.where((place) {
+        final distance = _locationService.calculateDistance(
+          _locationService.currentPosition!.latitude,
+          _locationService.currentPosition!.longitude,
+          place.latitude,
+          place.longitude,
+        );
+        return distance <= _currentFilter.maxDistance!;
+      }).toList();
+    }
+    
+    // Apply rating filter
+    if (_currentFilter.minRating != null) {
+      filtered = filtered.where((place) {
+        return place.rating != null && place.rating! >= _currentFilter.minRating!;
+      }).toList();
+    }
+    
+    // Apply price filter
+    if (_currentFilter.priceLevels.isNotEmpty) {
+      filtered = filtered.where((place) {
+        return place.priceLevel != null && 
+               _currentFilter.priceLevels.contains(place.priceLevel);
+      }).toList();
+    }
+    
+    // Apply type filter
+    if (_currentFilter.placeTypes.isNotEmpty) {
+      filtered = filtered.where((place) {
+        final placeType = place.type.toLowerCase();
+        return _currentFilter.placeTypes.any((type) => 
+          placeType.contains(type.toLowerCase()));
+      }).toList();
+    }
+    
+    // Apply sorting
+    switch (_currentFilter.sortBy) {
+      case SortBy.distance:
+        filtered.sort((a, b) {
+          final distA = _locationService.calculateDistance(
+            _locationService.currentPosition!.latitude,
+            _locationService.currentPosition!.longitude,
+            a.latitude,
+            a.longitude,
+          );
+          final distB = _locationService.calculateDistance(
+            _locationService.currentPosition!.latitude,
+            _locationService.currentPosition!.longitude,
+            b.latitude,
+            b.longitude,
+          );
+          return distA.compareTo(distB);
+        });
+        break;
+      case SortBy.rating:
+        filtered.sort((a, b) {
+          final ratingA = a.rating ?? 0;
+          final ratingB = b.rating ?? 0;
+          return ratingB.compareTo(ratingA);
+        });
+        break;
+      case SortBy.priceLowToHigh:
+        filtered.sort((a, b) {
+          final priceA = a.priceLevel?.length ?? 0;
+          final priceB = b.priceLevel?.length ?? 0;
+          return priceA.compareTo(priceB);
+        });
+        break;
+      case SortBy.priceHighToLow:
+        filtered.sort((a, b) {
+          final priceA = a.priceLevel?.length ?? 0;
+          final priceB = b.priceLevel?.length ?? 0;
+          return priceB.compareTo(priceA);
+        });
+        break;
+    }
+    
+    setState(() {
+      _filteredResults = filtered;
+    });
+  }
+
+  void _showFilterSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => SearchFilterSheet(
+        currentFilter: _currentFilter,
+        onFilterChanged: (filter) {
+          setState(() {
+            _currentFilter = filter;
+            _applyFilters();
+          });
+        },
+      ),
+    );
+  }
+
+  void _showImagePickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt),
+                  title: const Text('Take a Photo'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library),
+                  title: const Text('Choose from Gallery'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.cancel),
+                  title: const Text('Cancel'),
+                  onTap: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _loadMore() async {
@@ -175,6 +443,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _isLoadingMore = false;
         if (result.success) {
           _searchResults.addAll(result.locations);
+          _applyFilters(); // Re-apply filters to include new results
           _currentPage++;
           _hasMoreResults = result.hasMore;
         }
@@ -250,9 +519,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
+      appBar: _selectedIndex == 0 ? AppBar(
         title: const Text('Wandr'),
         actions: [
+          // Filter button
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.filter_list),
+                onPressed: _showFilterSheet,
+                tooltip: 'Filter results',
+              ),
+              if (_currentFilter.hasActiveFilters)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          IconButton(
+            icon: Icon(
+              _isTrackingEnabled ? Icons.location_on : Icons.location_off,
+              color: _isTrackingEnabled ? Colors.green : Colors.grey,
+            ),
+            onPressed: _toggleTracking,
+            tooltip: _isTrackingEnabled ? 'Tracking enabled' : 'Tracking disabled',
+          ),
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: () {
@@ -274,17 +574,45 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             onPressed: _signOut,
           ),
         ],
-      ),
+      ) : null,
       body: SafeArea(
-        child: Column(
+        child: IndexedStack(
+          index: _selectedIndex,
           children: [
-            _buildHeader(),
-            if (_errorMessage != null) _buildErrorMessage(),
-            Expanded(
-              child: _buildContent(),
+            // Search screen
+            Column(
+              children: [
+                _buildHeader(),
+                if (_errorMessage != null) _buildErrorMessage(),
+                Expanded(
+                  child: _buildContent(),
+                ),
+              ],
             ),
+            // Visit history screen
+            const VisitHistoryScreen(),
           ],
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.search),
+            label: 'Discover',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.map),
+            label: 'My Journey',
+          ),
+        ],
+        selectedItemColor: Theme.of(context).primaryColor,
+        unselectedItemColor: Colors.grey,
       ),
     );
   }
@@ -371,62 +699,226 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildSearchBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!, width: 1),
-      ),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Try "pet friendly cafes" or "romantic dinner"',
-          hintStyle: TextStyle(color: Colors.grey[500]),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
-          suffixIcon: _isLoading
-              ? const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+    return Column(
+      children: [
+        if (_selectedImage != null) ...[
+          // Show selected image
+          Container(
+            height: 120,
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.file(
+                    _selectedImage!,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
                   ),
-                )
-              : IconButton(
-                  icon: Icon(
-                    Icons.arrow_forward_ios,
-                    color: Theme.of(context).primaryColor,
-                  ),
-                  onPressed: _performSearch,
                 ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.black54,
+                    radius: 16,
+                    child: IconButton(
+                      icon: const Icon(Icons.close, size: 16, color: Colors.white),
+                      onPressed: _clearSelectedImage,
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.image, size: 16, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Image Search',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        // Search input
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey[200]!, width: 1),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  enabled: _selectedImage == null, // Disable text input when image is selected
+                  decoration: InputDecoration(
+                    hintText: _selectedImage != null 
+                      ? 'Using image search...' 
+                      : 'Try "pet friendly cafes" or "romantic dinner"',
+                    hintStyle: TextStyle(color: Colors.grey[500]),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
+                  ),
+                  onSubmitted: (_) => _performSearch(),
+                ),
+              ),
+              // Image picker button
+              IconButton(
+                icon: Icon(
+                  Icons.camera_alt,
+                  color: _selectedImage != null 
+                    ? Theme.of(context).primaryColor 
+                    : Colors.grey[600],
+                ),
+                onPressed: _showImagePickerOptions,
+                tooltip: 'Search by image',
+              ),
+              // Search button
+              _isLoading
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : IconButton(
+                      icon: Icon(
+                        Icons.arrow_forward_ios,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                      onPressed: _performSearch,
+                    ),
+            ],
+          ),
         ),
-        onSubmitted: (_) => _performSearch(),
-      ),
+      ],
     );
   }
 
   Widget _buildDistanceSlider() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Search Radius: ${_searchRadius.toStringAsFixed(0)} km',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[700],
-            fontWeight: FontWeight.w500,
-          ),
+        Row(
+          children: [
+            Icon(Icons.near_me, size: 16, color: Colors.grey[600]),
+            const SizedBox(width: 8),
+            Text(
+              'Search Radius: ${_searchRadius.toStringAsFixed(1)} km',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[700],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            // Add visual indicator of radius size
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _searchRadius < 10 
+                  ? Colors.green[100] 
+                  : _searchRadius < 30 
+                    ? Colors.orange[100] 
+                    : Colors.blue[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _searchRadius < 10 
+                  ? 'Local' 
+                  : _searchRadius < 30 
+                    ? 'Nearby' 
+                    : 'Wide',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _searchRadius < 10 
+                    ? Colors.green[700] 
+                    : _searchRadius < 30 
+                      ? Colors.orange[700] 
+                      : Colors.blue[700],
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ),
-        Expanded(
+        const SizedBox(height: 8),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: Theme.of(context).primaryColor,
+            inactiveTrackColor: Theme.of(context).primaryColor.withOpacity(0.2),
+            thumbColor: Theme.of(context).primaryColor,
+            overlayColor: Theme.of(context).primaryColor.withOpacity(0.2),
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+            trackHeight: 6,
+          ),
           child: Slider(
             value: _searchRadius,
-            min: 1,
-            max: 50,
+            min: 1.0,
+            max: 50.0,
             divisions: 49,
-            label: '${_searchRadius.toStringAsFixed(0)} km',
-            onChanged: (value) => setState(() => _searchRadius = value),
-            activeColor: Theme.of(context).primaryColor,
+            label: '${_searchRadius.toStringAsFixed(1)} km',
+            onChanged: (value) {
+              setState(() {
+                _searchRadius = value;
+                // If we have search results, show a message that they need to search again
+                if (_searchResults.isNotEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Tap search to update results with new radius'),
+                      duration: const Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                      margin: const EdgeInsets.only(bottom: 80, left: 20, right: 20),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  );
+                }
+              });
+            },
+          ),
+        ),
+        // Add scale markers
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('1 km', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+              Text('25 km', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+              Text('50 km', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+            ],
           ),
         ),
       ],
@@ -458,7 +950,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildContent() {
-    if (_searchResults.isNotEmpty) {
+    if (_filteredResults.isNotEmpty || (_searchResults.isNotEmpty && _currentFilter.hasActiveFilters)) {
       return _buildSearchResults();
     } else if (_recentSearches.isNotEmpty && !_isLoading) {
       return _buildRecentSearches();
@@ -468,31 +960,113 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildSearchResults() {
-    return NotificationListener<ScrollNotification>(
-      onNotification: (scrollInfo) {
-        if (scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent &&
-            _hasMoreResults &&
-            !_isLoadingMore) {
-          _loadMore();
-        }
-        return false;
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.only(top: 8, bottom: 16),
-        itemCount: _searchResults.length + (_hasMoreResults ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index == _searchResults.length) {
-            return _buildLoadMoreButton();
-          }
-          return FadeTransition(
-            opacity: _fadeAnimation,
-            child: PlaceCard(
-              place: _searchResults[index],
-              currentPosition: _locationService.currentPosition!,
-              processImageUrl: _searchService.processImageUrl,
+    final displayResults = _currentFilter.hasActiveFilters ? _filteredResults : _searchResults;
+    
+    return Column(
+      children: [
+        if (_currentFilter.hasActiveFilters) _buildActiveFiltersBar(),
+        if (displayResults.isEmpty && _currentFilter.hasActiveFilters)
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.filter_alt_off,
+                    size: 80,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'No places match your filters',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Try adjusting your filters',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _currentFilter = SearchFilter();
+                        _applyFilters();
+                      });
+                    },
+                    child: const Text('Clear Filters'),
+                  ),
+                ],
+              ),
             ),
-          );
-        },
+          )
+        else
+          Expanded(
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (scrollInfo) {
+                if (scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent &&
+                    _hasMoreResults &&
+                    !_isLoadingMore) {
+                  _loadMore();
+                }
+                return false;
+              },
+              child: ListView.builder(
+                padding: const EdgeInsets.only(top: 8, bottom: 16),
+                itemCount: displayResults.length + (_hasMoreResults ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == displayResults.length) {
+                    return _buildLoadMoreButton();
+                  }
+                  return FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: PlaceCard(
+                      place: displayResults[index],
+                      currentPosition: _locationService.currentPosition!,
+                      processImageUrl: _searchService.processImageUrl,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildActiveFiltersBar() {
+    return Container(
+      color: Colors.grey[100],
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Icon(Icons.filter_list, size: 16, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Text(
+            'Filtered results',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            '${_filteredResults.length} of ${_searchResults.length} places',
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).primaryColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -601,10 +1175,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           const SizedBox(height: 8),
           Text(
-            'Search for your perfect vibe',
+            'Search by text or snap a photo',
             style: TextStyle(
               fontSize: 16,
               color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 32),
+          // Image search hint
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue[200]!),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lightbulb_outline, color: Colors.blue[700], size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Tip: Take a photo of a place or food to find similar spots nearby!',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.blue[700],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           if (_locationService.currentPosition == null) ...[

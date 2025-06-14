@@ -1,9 +1,12 @@
 // lib/services/search_service.dart
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
+import 'package:myapp/models/models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/models.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:path/path.dart' as path;
 
 class SearchService {
   static const String _cloudFunctionUrl = 'https://searchplaces-sk572tzuuq-uc.a.run.app';
@@ -14,40 +17,63 @@ class SearchService {
   // Cache for search results
   final Map<String, SearchCache> _searchCache = {};
   
-  // Search with pagination support
+  // Search with pagination support (text or image)
   Future<SearchResult> searchPlaces({
-    required String query,
+    String? query,
+    String? imageUrl,
     required double latitude,
     required double longitude,
     required double radiusKm,
     int page = 0,
   }) async {
     try {
-      // Check cache first
-      final cacheKey = '$query-$latitude-$longitude-$radiusKm';
-      if (_searchCache.containsKey(cacheKey) && page == 0) {
-        final cached = _searchCache[cacheKey]!;
-        if (DateTime.now().difference(cached.timestamp).inMinutes < 5) {
-          return SearchResult(
-            success: true,
-            locations: cached.locations.take(_resultsPerPage).toList(),
-            totalResults: cached.locations.length,
-            hasMore: cached.locations.length > _resultsPerPage,
-          );
+      // Determine input type
+      final isImageSearch = imageUrl != null && imageUrl.isNotEmpty;
+      final isTextSearch = query != null && query.isNotEmpty;
+      
+      if (!isImageSearch && !isTextSearch) {
+        return SearchResult(
+          success: false,
+          error: 'Please provide either text or image for search',
+        );
+      }
+
+      // Check cache first (for text searches only)
+      String? cacheKey;
+      if (isTextSearch) {
+        cacheKey = '$query-$latitude-$longitude-$radiusKm';
+        if (_searchCache.containsKey(cacheKey) && page == 0) {
+          final cached = _searchCache[cacheKey]!;
+          if (DateTime.now().difference(cached.timestamp).inMinutes < 5) {
+            return SearchResult(
+              success: true,
+              locations: cached.locations.take(_resultsPerPage).toList(),
+              totalResults: cached.locations.length,
+              hasMore: cached.locations.length > _resultsPerPage,
+            );
+          }
         }
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'inputType': isImageSearch ? 'image' : 'text',
+        'latitude': latitude,
+        'longitude': longitude,
+        'searchRadius': radiusKm * 1000, // Convert to meters
+      };
+
+      if (isTextSearch) {
+        requestBody['textInput'] = query;
+      } else {
+        requestBody['imageInputUri'] = imageUrl;
       }
 
       // Make API call
       final response = await http.post(
         Uri.parse(_cloudFunctionUrl),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'textInput': query,
-          'inputType': 'text',
-          'latitude': latitude,
-          'longitude': longitude,
-          'searchRadius': radiusKm * 1000, // Convert to meters
-        }),
+        body: jsonEncode(requestBody),
       ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
@@ -61,11 +87,13 @@ class SearchService {
           return distA.compareTo(distB);
         });
 
-        // Cache results
-        _searchCache[cacheKey] = SearchCache(
-          locations: sortedLocations,
-          timestamp: DateTime.now(),
-        );
+        // Cache results (text searches only)
+        if (isTextSearch && cacheKey != null) {
+          _searchCache[cacheKey] = SearchCache(
+            locations: sortedLocations,
+            timestamp: DateTime.now(),
+          );
+        }
 
         // Return paginated results
         final startIndex = page * _resultsPerPage;
@@ -93,6 +121,29 @@ class SearchService {
         success: false,
         error: 'Search failed: ${e.toString()}',
       );
+    }
+  }
+
+  // Upload image to Firebase Storage and get URL
+  Future<String?> uploadSearchImage(File imageFile) async {
+    try {
+      // Create a unique filename
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'search_images/${timestamp}_${path.basename(imageFile.path)}';
+      
+      // Upload to Firebase Storage
+      final ref = FirebaseStorage.instance.ref().child(fileName);
+      final uploadTask = await ref.putFile(imageFile);
+      
+      if (uploadTask.state == TaskState.success) {
+        final downloadUrl = await ref.getDownloadURL();
+        return downloadUrl;
+      }
+      
+      return null;
+    } catch (e) {
+      print('Error uploading image: $e');
+      return null;
     }
   }
 
@@ -135,7 +186,7 @@ class SearchService {
         .toList();
   }
 
-  Future<void> saveToHistory(String query, int resultCount, double latitude, double longitude) async {
+  Future<void> saveToHistory(String query, int resultCount, double latitude, double longitude, {bool isImageSearch = false}) async {
     final prefs = await SharedPreferences.getInstance();
     final history = SearchHistory(
       query: query,
@@ -143,6 +194,7 @@ class SearchService {
       resultCount: resultCount,
       latitude: latitude,
       longitude: longitude,
+      isImageSearch: isImageSearch,
     );
     
     final historyJson = prefs.getStringList('search_history') ?? [];
@@ -173,6 +225,7 @@ class SearchService {
     double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return earthRadius * c;
   }
+
   double _toRadians(double degrees) => degrees * (math.pi / 180);
 }
 
@@ -201,13 +254,14 @@ class SearchResult {
   });
 }
 
-// Add to models.dart or keep here
+// Search history class
 class SearchHistory {
   final String query;
   final DateTime timestamp;
   final int resultCount;
   final double latitude;
   final double longitude;
+  final bool isImageSearch;
 
   SearchHistory({
     required this.query,
@@ -215,6 +269,7 @@ class SearchHistory {
     required this.resultCount,
     required this.latitude,
     required this.longitude,
+    this.isImageSearch = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -223,6 +278,7 @@ class SearchHistory {
     'resultCount': resultCount,
     'latitude': latitude,
     'longitude': longitude,
+    'isImageSearch': isImageSearch,
   };
 
   factory SearchHistory.fromJson(Map<String, dynamic> json) => SearchHistory(
@@ -231,5 +287,6 @@ class SearchHistory {
     resultCount: json['resultCount'],
     latitude: json['latitude'],
     longitude: json['longitude'],
+    isImageSearch: json['isImageSearch'] ?? false,
   );
 }
