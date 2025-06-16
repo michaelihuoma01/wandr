@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:myapp/widgets/check_in_dialog.dart';
+import 'package:myapp/widgets/share_to_circle_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
 
@@ -337,75 +338,105 @@ class PlaceCard extends StatelessWidget {
     );
   }
 
-  Widget _buildActions(BuildContext context) {
+Widget _buildActions(BuildContext context) {
     return Column(
       children: [
-        // Check-in button
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () => _showCheckInDialog(context),
-            icon: const Icon(Icons.location_on, size: 18),
-            label: const Text('Check In'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+        // Primary action buttons row
+        Row(
+          children: [
+            // Check-in button
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _showCheckInDialog(context),
+                icon: const Icon(Icons.location_on, size: 18),
+                label: const Text('Check In'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
             ),
-          ),
+            const SizedBox(width: 8),
+            // Share to circle button
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _showShareToCircleDialog(context),
+                icon: const Icon(Icons.group, size: 18),
+                label: const Text('Share'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  side: BorderSide(color: Theme.of(context).primaryColor),
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 12), Row(
-      children: [
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: _openDirections,
-            icon: const Icon(Icons.directions, size: 18),
-            label: const Text('Directions'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+        const SizedBox(height: 12),
+        // Secondary action buttons row
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _openDirections,
+                icon: const Icon(Icons.directions, size: 18),
+                label: const Text('Directions'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
             ),
-          ),
+            const SizedBox(width: 12),
+            if (place.websiteUrl != null)
+              IconButton(
+                onPressed: () => _launchUrl(place.websiteUrl!),
+                icon: const Icon(Icons.language),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.grey[100],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            if (place.phoneNumber != null)
+              IconButton(
+                onPressed: () => _makePhoneCall(place.phoneNumber!),
+                icon: const Icon(Icons.phone),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.grey[100],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+          ],
         ),
-        const SizedBox(width: 12),
-        if (place.websiteUrl != null)
-          IconButton(
-            onPressed: () => _launchUrl(place.websiteUrl!),
-            icon: const Icon(Icons.language),
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.grey[100],
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        if (place.phoneNumber != null)
-          IconButton(
-            onPressed: () => _makePhoneCall(place.phoneNumber!),
-            icon: const Icon(Icons.phone),
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.grey[100],
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
       ],
-    )
-      ]);
+    );
   }
 
     void _showCheckInDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => CheckInDialog(place: place),
+    );
+  }
+
+      void _showShareToCircleDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => ShareToCircleDialog(place: place),
     );
   }
 

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:myapp/models/models.dart';
+import 'package:myapp/screens/circles/circles_list_screen.dart';
 import 'package:myapp/screens/history_screen.dart';
 import 'package:myapp/screens/visit_history_screen.dart';
 
@@ -589,6 +590,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ],
             ),
+             // Circles screen
+            const CirclesListScreen(),
             // Visit history screen
             const VisitHistoryScreen(),
           ],
@@ -605,6 +608,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           BottomNavigationBarItem(
             icon: Icon(Icons.search),
             label: 'Discover',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.group),
+            label: 'Circles',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.map),
