@@ -446,7 +446,7 @@ class CircleService {
           .collection('boards')
           .doc();
 
-      final board = VibeBoard(
+   final board = VibeBoard(
         id: boardRef.id,
         circleId: circleId,
         creatorId: _userId!,
@@ -458,9 +458,17 @@ class CircleService {
         coverImageUrl: places.isNotEmpty ? places.first.imageUrl : null,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        likedBy: [],
+        savedBy: [],
+        likeCount: 0,
+        saveCount: 0,
       );
 
-      await boardRef.set(board.toJson());
+      // Convert BoardPlace objects to JSON
+      final boardJson = board.toJson();
+      boardJson['places'] = places.map((place) => place.toJson()).toList();
+
+      await boardRef.set(boardJson);
 
       // Add activity
       await _addActivity(

@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:myapp/widgets/check_in_dialog.dart';
 import 'package:myapp/widgets/share_to_circle_dialog.dart';
+import 'package:myapp/widgets/share_to_vibe_board_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
 
@@ -19,12 +20,14 @@ class PlaceCard extends StatelessWidget {
     required this.processImageUrl,
   });
 
-  double get _distance => Geolocator.distanceBetween(
-    currentPosition.latitude,
-    currentPosition.longitude,
-    place.latitude,
-    place.longitude,
-  ) / 1000; // Convert to km
+  double get _distance =>
+      Geolocator.distanceBetween(
+        currentPosition.latitude,
+        currentPosition.longitude,
+        place.latitude,
+        place.longitude,
+      ) /
+      1000; // Convert to km
 
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(url);
@@ -41,7 +44,8 @@ class PlaceCard extends StatelessWidget {
   }
 
   Future<void> _openDirections() async {
-    final url = 'https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}';
+    final url =
+        'https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}';
     await _launchUrl(url);
   }
 
@@ -94,7 +98,8 @@ class PlaceCard extends StatelessWidget {
             itemBuilder: (context, index) {
               final imageUrl = processImageUrl(place.imageUrls![index]);
               return ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
                 child: CachedNetworkImage(
                   imageUrl: imageUrl,
                   fit: BoxFit.cover,
@@ -107,9 +112,11 @@ class PlaceCard extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.image_not_supported, size: 50, color: Colors.grey[400]),
+                        Icon(Icons.image_not_supported,
+                            size: 50, color: Colors.grey[400]),
                         const SizedBox(height: 8),
-                        Text('Image unavailable', style: TextStyle(color: Colors.grey[600])),
+                        Text('Image unavailable',
+                            style: TextStyle(color: Colors.grey[600])),
                       ],
                     ),
                   ),
@@ -292,7 +299,8 @@ class PlaceCard extends StatelessWidget {
     );
   }
 
-  Widget _buildChip({IconData? icon, required String label, required Color color}) {
+  Widget _buildChip(
+      {IconData? icon, required String label, required Color color}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -323,22 +331,25 @@ class PlaceCard extends StatelessWidget {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: place.tags!.map((tag) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey[300]!, width: 1),
-        ),
-        child: Text(
-          tag,
-          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-        ),
-      )).toList(),
+      children: place.tags!
+          .map((tag) => Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.grey[300]!, width: 1),
+                ),
+                child: Text(
+                  tag,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                ),
+              ))
+          .toList(),
     );
   }
 
-Widget _buildActions(BuildContext context) {
+  Widget _buildActions(BuildContext context) {
     return Column(
       children: [
         // Primary action buttons row
@@ -362,6 +373,21 @@ Widget _buildActions(BuildContext context) {
             ),
             const SizedBox(width: 8),
             // Share to circle button
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _showAddToVibeBoardDialog(context),
+                icon: const Icon(Icons.group, size: 18),
+                label: const Text('Add to Board'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  side: BorderSide(color: Theme.of(context).primaryColor),
+                ),
+              ),
+            ),
+
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () => _showShareToCircleDialog(context),
@@ -426,17 +452,24 @@ Widget _buildActions(BuildContext context) {
     );
   }
 
-    void _showCheckInDialog(BuildContext context) {
+  void _showCheckInDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => CheckInDialog(place: place),
     );
   }
 
-      void _showShareToCircleDialog(BuildContext context) {
+  void _showShareToCircleDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => ShareToCircleDialog(place: place),
+    );
+  }
+
+  void _showAddToVibeBoardDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => ShareToVibeBoardDialog(place: place),
     );
   }
 

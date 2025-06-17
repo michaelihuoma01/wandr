@@ -368,7 +368,7 @@ class BoardPlace {
   final String? customNote;
   final List<String> vibes;
   final String? imageUrl;
-  final int orderIndex;
+  int orderIndex;
 
   BoardPlace({
     required this.placeId,

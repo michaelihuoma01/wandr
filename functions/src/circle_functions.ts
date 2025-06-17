@@ -1,19 +1,26 @@
 // functions/src/circle_functions.ts
-import * as functions from 'firebase-functions';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onCall } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
 
 const db = admin.firestore();
 const fcm = admin.messaging();
 
 // Circle Activity Notifications
-export const onCircleActivity = functions.firestore
-  .document('circles/{circleId}/activity/{activityId}')
-  .onCreate(async (snap: functions.firestore.QueryDocumentSnapshot, context: functions.EventContext) => {
-    const activity = snap.data();
-    const { circleId, activityId } = context.params;
+export const onCircleActivity = onDocumentCreated({document: 'circles/{circleId}/activity/{activityId}'},
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) {
+      console.log('No data associated with the event');
+      return;
+    }
+
+    const activity = snapshot.data();
+    const { circleId, activityId } = event.params;
 
     try {
-      // Get circle info§§
+      // Get circle info
       const circleDoc = await db.collection('circles').doc(circleId).get();
       if (!circleDoc.exists) return;
       
@@ -99,115 +106,119 @@ export const onCircleActivity = functions.firestore
     } catch (error) {
       console.error('Error sending circle notifications:', error);
     }
-  });
+  }
+);
 
 // Process Join Requests
-export const processJoinRequest = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
-  }
-
-  const { circleId, userId, approve } = data;
-
-  try {
-    // Verify the caller is an admin
-    const memberDoc = await db
-      .collection('circles')
-      .doc(circleId)
-      .collection('members')
-      .doc(context.auth.uid)
-      .get();
-
-    if (!memberDoc.exists || memberDoc.data()?.role !== 'admin') {
-      throw new functions.https.HttpsError('permission-denied', 'Only admins can process join requests');
+export const processJoinRequest = onCall({cors: true},
+  async (request) => {
+    const auth = request.auth;
+    if (!auth) {
+      throw new Error('User must be authenticated');
     }
 
-    // Get the join request
-    const requestRef = db
-      .collection('circles')
-      .doc(circleId)
-      .collection('joinRequests')
-      .doc(userId);
+    const { circleId, userId, approve } = request.data;
 
-    const requestDoc = await requestRef.get();
-    if (!requestDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Join request not found');
-    }
+    try {
+      // Verify the caller is an admin
+      const memberDoc = await db
+        .collection('circles')
+        .doc(circleId)
+        .collection('members')
+        .doc(auth.uid)
+        .get();
 
-    const request = requestDoc.data()!;
+      if (!memberDoc.exists || memberDoc.data()?.role !== 'admin') {
+        throw new Error('Only admins can process join requests');
+      }
 
-    if (approve) {
-      // Add user as member
-      const batch = db.batch();
+      // Get the join request
+      const requestRef = db
+        .collection('circles')
+        .doc(circleId)
+        .collection('joinRequests')
+        .doc(userId);
 
-      // Add to circle members
-      batch.set(
-        db.collection('circles').doc(circleId).collection('members').doc(userId),
-        {
-          userId,
-          userName: request.userName,
-          userPhotoUrl: request.userPhotoUrl,
+      const requestDoc = await requestRef.get();
+      if (!requestDoc.exists) {
+        throw new Error('Join request not found');
+      }
+
+      const joinRequest = requestDoc.data()!;
+
+      if (approve) {
+        // Add user as member
+        const batch = db.batch();
+
+        // Add to circle members
+        batch.set(
+          db.collection('circles').doc(circleId).collection('members').doc(userId),
+          {
+            userId,
+            userName: joinRequest.userName,
+            userPhotoUrl: joinRequest.userPhotoUrl,
+            circleId,
+            role: 'member',
+            joinedAt: admin.firestore.FieldValue.serverTimestamp(),
+            notificationsEnabled: true,
+            contributionScore: 0,
+            checkInsShared: 0,
+            boardsCreated: 0,
+            reviewsWritten: 0,
+          }
+        );
+
+        // Add to user's circles
+        batch.set(
+          db.collection('users').doc(userId).collection('circles').doc(circleId),
+          {
+            joinedAt: admin.firestore.FieldValue.serverTimestamp(),
+            role: 'member',
+          }
+        );
+
+        // Update circle member count
+        batch.update(db.collection('circles').doc(circleId), {
+          memberCount: admin.firestore.FieldValue.increment(1),
+        });
+
+        // Update request status
+        batch.update(requestRef, {
+          status: 'approved',
+          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          processedBy: auth.uid,
+        });
+
+        await batch.commit();
+
+        // Send notification to user
+        await sendNotificationToUser(userId, {
+          title: 'Join Request Approved!',
+          body: `You've been accepted into ${joinRequest.circleName}`,
+          type: 'join_approved',
           circleId,
-          role: 'member',
-          joinedAt: admin.firestore.FieldValue.serverTimestamp(),
-          notificationsEnabled: true,
-          contributionScore: 0,
-          checkInsShared: 0,
-          boardsCreated: 0,
-          reviewsWritten: 0,
-        }
-      );
+        });
+      } else {
+        // Reject request
+        await requestRef.update({
+          status: 'rejected',
+          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          processedBy: auth.uid,
+        });
+      }
 
-      // Add to user's circles
-      batch.set(
-        db.collection('users').doc(userId).collection('circles').doc(circleId),
-        {
-          joinedAt: admin.firestore.FieldValue.serverTimestamp(),
-          role: 'member',
-        }
-      );
-
-      // Update circle member count
-      batch.update(db.collection('circles').doc(circleId), {
-        memberCount: admin.firestore.FieldValue.increment(1),
-      });
-
-      // Update request status
-      batch.update(requestRef, {
-        status: 'approved',
-        processedAt: admin.firestore.FieldValue.serverTimestamp(),
-        processedBy: context.auth.uid,
-      });
-
-      await batch.commit();
-
-      // Send notification to user
-      await sendNotificationToUser(userId, {
-        title: 'Join Request Approved!',
-        body: `You've been accepted into ${request.circleName}`,
-        type: 'join_approved',
-        circleId,
-      });
-    } else {
-      // Reject request
-      await requestRef.update({
-        status: 'rejected',
-        processedAt: admin.firestore.FieldValue.serverTimestamp(),
-        processedBy: context.auth.uid,
-      });
+      return { success: true };
+    } catch (error) {
+      console.error('Error processing join request:', error);
+      throw new Error('Failed to process request');
     }
-
-    return { success: true };
-  } catch (error) {
-    console.error('Error processing join request:', error);
-    throw new functions.https.HttpsError('internal', 'Failed to process request');
   }
-});
+);
 
 // Aggregate Circle Places
-export const aggregateCirclePlaces = functions.pubsub
-  .schedule('every 6 hours')
-  .onRun(async (context) => {
+export const aggregateCirclePlaces = onSchedule(
+  {schedule: 'every 6 hours'},
+  async (event) => {
     try {
       const circlesSnapshot = await db.collection('circles').get();
 
@@ -284,87 +295,97 @@ export const aggregateCirclePlaces = functions.pubsub
     } catch (error) {
       console.error('Error aggregating circle places:', error);
     }
-  });
+  }
+);
 
 // Calculate Vibe Compatibility
-export const calculateVibeCompatibility = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
-  }
+export const calculateVibeCompatibility = onCall(
+  {
+    cors: true,
+  },
+  async (request) => {
+    const auth = request.auth;
+    if (!auth) {
+      throw new Error('User must be authenticated');
+    }
 
-  const userId = context.auth.uid;
+    const userId = auth.uid;
 
-  try {
-    // Get user's vibe preferences from visits
-    const visitsSnapshot = await db
-      .collection('visits')
-      .where('userId', '==', userId)
-      .orderBy('visitTime', 'desc')
-      .limit(50)
-      .get();
+    try {
+      // Get user's vibe preferences from visits
+      const visitsSnapshot = await db
+        .collection('visits')
+        .where('userId', '==', userId)
+        .orderBy('visitTime', 'desc')
+        .limit(50)
+        .get();
 
-    const userVibes = new Map<string, number>();
-    
-    for (const visitDoc of visitsSnapshot.docs) {
-      const visit = visitDoc.data();
-      if (visit.vibes) {
-        visit.vibes.forEach((vibe: string) => {
-          userVibes.set(vibe, (userVibes.get(vibe) || 0) + 1);
-        });
+      const userVibes = new Map<string, number>();
+      
+      for (const visitDoc of visitsSnapshot.docs) {
+        const visit = visitDoc.data();
+        if (visit.vibes) {
+          visit.vibes.forEach((vibe: string) => {
+            userVibes.set(vibe, (userVibes.get(vibe) || 0) + 1);
+          });
+        }
       }
+
+      // Sort vibes by frequency
+      const sortedVibes = Array.from(userVibes.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([vibe]) => vibe);
+
+      if (sortedVibes.length === 0) {
+        return { suggestions: [] };
+      }
+
+      // Find compatible circles
+      const circlesSnapshot = await db
+        .collection('circles')
+        .where('isPublic', '==', true)
+        .where('vibePreferences', 'array-contains-any', sortedVibes.slice(0, 5))
+        .limit(20)
+        .get();
+
+      const suggestions = circlesSnapshot.docs.map(doc => {
+        const circle = doc.data();
+        const matchingVibes = circle.vibePreferences.filter((vibe: string) => 
+          sortedVibes.includes(vibe)
+        );
+        
+        const score = matchingVibes.length / circle.vibePreferences.length;
+        
+        return {
+          circleId: doc.id,
+          circle: {
+            id: doc.id,
+            ...circle,
+          },
+          compatibilityScore: score,
+          matchingVibes,
+          reason: `Matches ${matchingVibes.length} of your favorite vibes`,
+        };
+      });
+
+      // Sort by compatibility score
+      suggestions.sort((a, b) => b.compatibilityScore - a.compatibilityScore);
+
+      return { suggestions: suggestions.slice(0, 10) };
+    } catch (error) {
+      console.error('Error calculating vibe compatibility:', error);
+      throw new Error('Failed to calculate compatibility');
     }
-
-    // Sort vibes by frequency
-    const sortedVibes = Array.from(userVibes.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([vibe]) => vibe);
-
-    if (sortedVibes.length === 0) {
-      return { suggestions: [] };
-    }
-
-    // Find compatible circles
-    const circlesSnapshot = await db
-      .collection('circles')
-      .where('isPublic', '==', true)
-      .where('vibePreferences', 'array-contains-any', sortedVibes.slice(0, 5))
-      .limit(20)
-      .get();
-
-    const suggestions = circlesSnapshot.docs.map(doc => {
-      const circle = doc.data();
-      const matchingVibes = circle.vibePreferences.filter((vibe: string) => 
-        sortedVibes.includes(vibe)
-      );
-      
-      const score = matchingVibes.length / circle.vibePreferences.length;
-      
-      return {
-        circleId: doc.id,
-        circle: {
-          id: doc.id,
-          ...circle,
-        },
-        compatibilityScore: score,
-        matchingVibes,
-        reason: `Matches ${matchingVibes.length} of your favorite vibes`,
-      };
-    });
-
-    // Sort by compatibility score
-    suggestions.sort((a, b) => b.compatibilityScore - a.compatibilityScore);
-
-    return { suggestions: suggestions.slice(0, 10) };
-  } catch (error) {
-    console.error('Error calculating vibe compatibility:', error);
-    throw new functions.https.HttpsError('internal', 'Failed to calculate compatibility');
   }
-});
+);
 
 // Circle Insights (Analytics)
-export const generateCircleInsights = functions.pubsub
-  .schedule('every sunday 00:00')
-  .onRun(async (context) => {
+export const generateCircleInsights = onSchedule(
+  {
+    schedule: 'every sunday 00:00',
+    timeZone: 'America/New_York', // Adjust as needed
+  },
+  async (event) => {
     try {
       const circlesSnapshot = await db.collection('circles').get();
 
@@ -402,7 +423,7 @@ export const generateCircleInsights = functions.pubsub
           );
         });
 
-        // Find most active member
+        // Find most active members
         const mostActiveMembers = Array.from(memberActivityMap.entries())
           .sort((a, b) => b[1] - a[1])
           .slice(0, 3);
@@ -430,7 +451,8 @@ export const generateCircleInsights = functions.pubsub
     } catch (error) {
       console.error('Error generating circle insights:', error);
     }
-  });
+  }
+);
 
 // Helper Functions
 function getNotificationTitle(activityType: string, circleName: string): string {

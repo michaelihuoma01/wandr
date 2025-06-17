@@ -1,11 +1,15 @@
 // lib/screens/circles/create_vibe_board_screen.dart
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:geolocator/geolocator.dart';
+import 'dart:async';
 import '../../models/circle_models.dart';
 import '../../models/models.dart';
+import '../../models/visit_models.dart';
 import '../../services/circle_service.dart';
 import '../../services/search_service.dart';
 import '../../services/location_service.dart';
+import '../../services/visit_service.dart';
 
 class CreateVibeBoardScreen extends StatefulWidget {
   final String circleId;
@@ -19,10 +23,12 @@ class CreateVibeBoardScreen extends StatefulWidget {
   State<CreateVibeBoardScreen> createState() => _CreateVibeBoardScreenState();
 }
 
-class _CreateVibeBoardScreenState extends State<CreateVibeBoardScreen> {
+class _CreateVibeBoardScreenState extends State<CreateVibeBoardScreen> 
+    with SingleTickerProviderStateMixin {
   final CircleService _circleService = CircleService();
   final SearchService _searchService = SearchService();
   final LocationService _locationService = LocationService();
+  final VisitService _visitService = VisitService();
   
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -32,9 +38,22 @@ class _CreateVibeBoardScreenState extends State<CreateVibeBoardScreen> {
   final List<BoardPlace> _selectedPlaces = [];
   final Set<String> _tags = {};
   
+  late TabController _tabController;
   List<PlaceDetails> _searchResults = [];
+  List<PlaceVisit> _recentCheckIns = [];
   bool _isSearching = false;
   bool _isCreating = false;
+  bool _isLoadingCheckIns = true;
+  
+  Timer? _searchDebouncer;
+  String _lastSearchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _loadRecentCheckIns();
+  }
 
   @override
   void dispose() {
@@ -42,33 +61,81 @@ class _CreateVibeBoardScreenState extends State<CreateVibeBoardScreen> {
     _descriptionController.dispose();
     _searchController.dispose();
     _tagController.dispose();
+    _tabController.dispose();
+    _searchDebouncer?.cancel();
     super.dispose();
   }
 
-  Future<void> _searchPlaces(String query) async {
+  Future<void> _loadRecentCheckIns() async {
+    setState(() => _isLoadingCheckIns = true);
+    
+    try {
+      final visits = await _visitService.getVisitHistory().first;
+      setState(() {
+        _recentCheckIns = visits.take(20).toList(); // Show last 20 check-ins
+        _isLoadingCheckIns = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingCheckIns = false);
+      print('Error loading check-ins: $e');
+    }
+  }
+
+  void _onSearchChanged(String query) {
+    // Cancel previous debouncer
+    _searchDebouncer?.cancel();
+    
     if (query.isEmpty) {
-      setState(() => _searchResults = []);
+      setState(() {
+        _searchResults = [];
+        _lastSearchQuery = '';
+      });
       return;
     }
 
-    setState(() => _isSearching = true);
+    // Don't search if query is the same
+    if (query == _lastSearchQuery) return;
 
-    final position = _locationService.currentPosition;
-    if (position == null) {
-      await _locationService.getCurrentLocation();
-    }
-
-    final result = await _searchService.searchPlaces(
-      query: query,
-      latitude: position?.latitude ?? 25.2048, // Default to Dubai
-      longitude: position?.longitude ?? 55.2708,
-      radiusKm: 20,
-    );
-
-    setState(() {
-      _isSearching = false;
-      _searchResults = result.locations;
+    // Start new debouncer
+    _searchDebouncer = Timer(const Duration(milliseconds: 500), () {
+      if (query.length > 2) {
+        _searchPlaces(query);
+      }
     });
+  }
+
+  Future<void> _searchPlaces(String query) async {
+    if (_isSearching) return; // Prevent multiple simultaneous searches
+    
+    setState(() {
+      _isSearching = true;
+      _lastSearchQuery = query;
+    });
+
+    try {
+      final position = _locationService.currentPosition ?? 
+                      await _locationService.getCurrentLocation() as Position;
+
+      final result = await _searchService.searchPlaces(
+        query: query,
+        latitude: position.latitude ?? 25.2048, // Default to Dubai
+        longitude: position.longitude ?? 55.2708,
+        radiusKm: 20,
+      );
+
+      // Only update if this is still the latest query
+      if (query == _lastSearchQuery && mounted) {
+        setState(() {
+          _searchResults = result.locations;
+          _isSearching = false;
+        });
+      }
+    } catch (e) {
+      if (mounted && query == _lastSearchQuery) {
+        setState(() => _isSearching = false);
+        print('Search error: $e');
+      }
+    }
   }
 
   void _addPlace(PlaceDetails place) {
@@ -81,10 +148,25 @@ class _CreateVibeBoardScreenState extends State<CreateVibeBoardScreen> {
         longitude: place.longitude,
         imageUrl: place.imageUrls?.isNotEmpty == true ? place.imageUrls!.first : null,
         orderIndex: _selectedPlaces.length,
+        vibes: [],
       );
       _selectedPlaces.add(boardPlace);
-      _searchController.clear();
-      _searchResults = [];
+    });
+  }
+
+  void _addPlaceFromVisit(PlaceVisit visit) {
+    setState(() {
+      final boardPlace = BoardPlace(
+        placeId: visit.placeId ?? '',
+        placeName: visit.placeName,
+        placeType: visit.placeType ?? 'Place',
+        latitude: visit.latitude,
+        longitude: visit.longitude,
+        imageUrl: visit.photoUrls?.isNotEmpty == true ? visit.photoUrls!.first : null,
+        orderIndex: _selectedPlaces.length,
+        vibes: visit.vibes,
+      );
+      _selectedPlaces.add(boardPlace);
     });
   }
 
@@ -343,74 +425,52 @@ class _CreateVibeBoardScreenState extends State<CreateVibeBoardScreen> {
                   ),
                   const SizedBox(height: 12),
                   
-                  // Search bar
-                  TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search for places to add',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _isSearching
-                          ? const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                            )
-                          : null,
+                  // Tab bar for search vs recent
+                  Container(
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    onChanged: (value) {
-                      if (value.length > 2) {
-                        _searchPlaces(value);
-                      }
-                    },
+                    child: TabBar(
+                      controller: _tabController,
+                      indicator: BoxDecoration(
+                        color: Theme.of(context).primaryColor,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.grey[600],
+                      tabs: const [
+                        Tab(text: 'Search'),
+                        Tab(text: 'Recent Check-ins'),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 16),
                   
-                  // Search results
-                  if (_searchResults.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      constraints: const BoxConstraints(maxHeight: 200),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _searchResults.length,
-                        itemBuilder: (context, index) {
-                          final place = _searchResults[index];
-                          final isAdded = _selectedPlaces
-                              .any((p) => p.placeId == place.placeId);
-                          
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Colors.grey[200],
-                              backgroundImage: place.imageUrls?.isNotEmpty == true
-                                  ? CachedNetworkImageProvider(
-                                      _searchService.processImageUrl(place.imageUrls!.first),
-                                    )
-                                  : null,
-                              child: place.imageUrls?.isEmpty ?? true
-                                  ? const Icon(Icons.place)
-                                  : null,
-                            ),
-                            title: Text(place.name),
-                            subtitle: Text(place.type),
-                            trailing: isAdded
-                                ? const Icon(Icons.check, color: Colors.green)
-                                : const Icon(Icons.add),
-                            onTap: isAdded ? null : () => _addPlace(place),
-                          );
-                        },
-                      ),
+                  // Tab content
+                  SizedBox(
+                    height: 300,
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildSearchTab(),
+                        _buildRecentCheckInsTab(),
+                      ],
                     ),
-                  ],
+                  ),
                   
                   // Selected places
                   if (_selectedPlaces.isNotEmpty) ...[
                     const SizedBox(height: 20),
+                    const Text(
+                      'Selected Places',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     ReorderableListView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -419,7 +479,7 @@ class _CreateVibeBoardScreenState extends State<CreateVibeBoardScreen> {
                       itemBuilder: (context, index) {
                         final place = _selectedPlaces[index];
                         return Card(
-                          key: ValueKey(place.placeId),
+                          key: ValueKey(place.placeId + index.toString()),
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
                             leading: ReorderableDragStartListener(
@@ -436,27 +496,6 @@ class _CreateVibeBoardScreenState extends State<CreateVibeBoardScreen> {
                         );
                       },
                     ),
-                  ] else ...[
-                    const SizedBox(height: 40),
-                    Center(
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.add_location_alt,
-                            size: 48,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Search and add places to your board',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ],
               ),
@@ -465,5 +504,194 @@ class _CreateVibeBoardScreenState extends State<CreateVibeBoardScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildSearchTab() {
+    return Column(
+      children: [
+        // Search bar
+        TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: 'Search for places to add',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_isSearching)
+                        const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      else
+                        IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchResults = [];
+                              _lastSearchQuery = '';
+                            });
+                          },
+                        ),
+                    ],
+                  )
+                : null,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: Colors.grey[100],
+          ),
+          onChanged: _onSearchChanged,
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Search results
+        Expanded(
+          child: _searchResults.isEmpty && !_isSearching
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.search,
+                        size: 48,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Search for places to add',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _searchResults.length,
+                  itemBuilder: (context, index) {
+                    final place = _searchResults[index];
+                    final isAdded = _selectedPlaces
+                        .any((p) => p.placeId == place.placeId);
+                    
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.grey[200],
+                        backgroundImage: place.imageUrls?.isNotEmpty == true
+                            ? CachedNetworkImageProvider(
+                                _searchService.processImageUrl(place.imageUrls!.first),
+                              )
+                            : null,
+                        child: place.imageUrls?.isEmpty ?? true
+                            ? const Icon(Icons.place)
+                            : null,
+                      ),
+                      title: Text(place.name),
+                      subtitle: Text(place.type),
+                      trailing: isAdded
+                          ? const Icon(Icons.check, color: Colors.green)
+                          : const Icon(Icons.add),
+                      onTap: isAdded ? null : () => _addPlace(place),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentCheckInsTab() {
+    if (_isLoadingCheckIns) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_recentCheckIns.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.history,
+              size: 48,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'No recent check-ins',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: _recentCheckIns.length,
+      itemBuilder: (context, index) {
+        final visit = _recentCheckIns[index];
+        final isAdded = _selectedPlaces
+            .any((p) => p.placeId == visit.placeId || 
+                       (p.latitude == visit.latitude && p.longitude == visit.longitude));
+        
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: Colors.grey[200],
+            backgroundImage: visit.photoUrls?.isNotEmpty == true
+                ? CachedNetworkImageProvider(visit.photoUrls!.first)
+                : null,
+            child: visit.photoUrls?.isEmpty ?? true
+                ? const Icon(Icons.place)
+                : null,
+          ),
+          title: Text(visit.placeName),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(visit.placeType ?? 'Place'),
+              Text(
+                _formatVisitTime(visit.visitTime),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[500],
+                ),
+              ),
+            ],
+          ),
+          isThreeLine: true,
+          trailing: isAdded
+              ? const Icon(Icons.check, color: Colors.green)
+              : const Icon(Icons.add),
+          onTap: isAdded ? null : () => _addPlaceFromVisit(visit),
+        );
+      },
+    );
+  }
+
+  String _formatVisitTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    }
   }
 }

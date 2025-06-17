@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+import 'package:myapp/widgets/activity_comments.dart';
+import 'package:myapp/widgets/emoji_reactions.dart';
 import '../models/circle_models.dart';
 import '../models/visit_models.dart';
 
@@ -31,10 +33,10 @@ class CircleActivityCard extends StatelessWidget {
         children: [
           // Header
           _buildHeader(context),
-          
+
           // Content based on activity type
           _buildContent(context),
-          
+
           // Footer with actions
           _buildFooter(context),
         ],
@@ -55,7 +57,7 @@ class CircleActivityCard extends StatelessWidget {
                 : null,
             child: activity.userPhotoUrl == null
                 ? Text(
-                    activity.userName.isNotEmpty 
+                    activity.userName.isNotEmpty
                         ? activity.userName[0].toUpperCase()
                         : '?',
                     style: const TextStyle(fontSize: 18),
@@ -63,7 +65,7 @@ class CircleActivityCard extends StatelessWidget {
                 : null,
           ),
           const SizedBox(width: 12),
-          
+
           // User info and activity type
           Expanded(
             child: Column(
@@ -97,7 +99,7 @@ class CircleActivityCard extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // More options
           IconButton(
             icon: const Icon(Icons.more_horiz),
@@ -168,7 +170,7 @@ class CircleActivityCard extends StatelessWidget {
             ],
           ),
         ),
-        
+
         // Photos
         if (photoUrls.isNotEmpty) ...[
           const SizedBox(height: 12),
@@ -194,7 +196,7 @@ class CircleActivityCard extends StatelessWidget {
             ),
           ),
         ],
-        
+
         // Note
         if (note != null && note.isNotEmpty) ...[
           const SizedBox(height: 12),
@@ -210,7 +212,7 @@ class CircleActivityCard extends StatelessWidget {
             ),
           ),
         ],
-        
+
         // Rating
         if (rating != null) ...[
           const SizedBox(height: 12),
@@ -227,7 +229,7 @@ class CircleActivityCard extends StatelessWidget {
             ),
           ),
         ],
-        
+
         // Vibes
         if (vibes.isNotEmpty) ...[
           const SizedBox(height: 12),
@@ -259,7 +261,7 @@ class CircleActivityCard extends StatelessWidget {
             ),
           ),
         ],
-        
+
         const SizedBox(height: 12),
       ],
     );
@@ -296,7 +298,6 @@ class CircleActivityCard extends StatelessWidget {
             ],
           ),
         ),
-        
         if (imageUrl != null) ...[
           const SizedBox(height: 12),
           Padding(
@@ -312,7 +313,6 @@ class CircleActivityCard extends StatelessWidget {
             ),
           ),
         ],
-        
         if (note.isNotEmpty) ...[
           const SizedBox(height: 12),
           Padding(
@@ -327,7 +327,6 @@ class CircleActivityCard extends StatelessWidget {
             ),
           ),
         ],
-        
         const SizedBox(height: 12),
       ],
     );
@@ -368,7 +367,6 @@ class CircleActivityCard extends StatelessWidget {
             ],
           ),
         ),
-        
         if (coverImageUrl != null) ...[
           const SizedBox(height: 12),
           Padding(
@@ -384,7 +382,6 @@ class CircleActivityCard extends StatelessWidget {
             ),
           ),
         ],
-        
         const SizedBox(height: 12),
       ],
     );
@@ -431,7 +428,6 @@ class CircleActivityCard extends StatelessWidget {
             ],
           ),
         ),
-        
         if (quickTake.isNotEmpty) ...[
           const SizedBox(height: 12),
           Container(
@@ -453,7 +449,6 @@ class CircleActivityCard extends StatelessWidget {
             ),
           ),
         ],
-        
         const SizedBox(height: 12),
       ],
     );
@@ -474,7 +469,7 @@ class CircleActivityCard extends StatelessWidget {
 
   Widget _buildMilestoneContent(BuildContext context) {
     final message = activity.data['message'] ?? 'Circle milestone!';
-    
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Row(
@@ -488,8 +483,9 @@ class CircleActivityCard extends StatelessWidget {
   }
 
   Widget _buildFooter(BuildContext context) {
-    final isLiked = activity.likedBy.contains('currentUserId'); // TODO: Get current user ID
-    
+    final isLiked =
+        activity.likedBy.contains('currentUserId'); // TODO: Get current user ID
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -526,9 +522,33 @@ class CircleActivityCard extends StatelessWidget {
               ),
             ),
           ),
-          
+
+          EmojiReactionsWidget(
+              activityId: activity.id,
+              circleId: activity.circleId,
+              reactions: {
+                'Love': ['❤️'],
+                'Haha': ['😂'],
+                'Sad': ['😢'],
+                'Lit': ['🔥'],
+                'Yay!': ['🎉'],
+                'Yum': ['😋'],
+                'Wow': ['🤩']
+              },
+              onReact: (val) => {
+                    print("Reaction: $val"),
+                  }), // TODO: Implement reactions
+
+          ActivityCommentsWidget(
+              activityId: activity.id,
+              circleId: activity.circleId,
+              comments: [],
+              onAddComment: (onAddComment) => {
+                    print("Comment: $onAddComment"),
+                  }), // TODO: Implement comments
+
           const SizedBox(width: 16),
-          
+
           // Comment button
           InkWell(
             onTap: onComment,
@@ -556,9 +576,9 @@ class CircleActivityCard extends StatelessWidget {
               ),
             ),
           ),
-          
+
           const Spacer(),
-          
+
           // Share button
           IconButton(
             icon: Icon(Icons.share_outlined, size: 20, color: Colors.grey[600]),

@@ -2,7 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:myapp/screens/create_vibe_board_screen.dart';
-import 'package:myapp/widgets/viber_board_card.dart';
+import 'package:myapp/screens/vibe_board_detail_screen.dart';
+import 'package:myapp/widgets/vibe_board_card.dart';
 import '../../models/circle_models.dart';
 import '../../models/models.dart';
 import '../../models/visit_models.dart';
@@ -540,12 +541,25 @@ class _CircleDetailScreenState extends State<CircleDetailScreen>
         padding: const EdgeInsets.all(16),
         itemCount: _boards.length,
         itemBuilder: (context, index) {
-          return VibeBoardCard(
-            board: _boards[index],
-            onTap: () {
-              // TODO: Navigate to board detail
-            },
-          );
+          return  VibeBoardCard(
+              board: _boards[index],
+              circleId: widget.circleId,  // Add this line
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => VibeBoardDetailScreen(
+                      circleId: widget.circleId,
+                      boardId: _boards[index].id,
+                    ),
+                  ),
+                ).then((result) {
+                  if (result == 'deleted') {
+                    _loadBoards();
+                  }
+                });
+              },
+            );
         },
       ),
     );
