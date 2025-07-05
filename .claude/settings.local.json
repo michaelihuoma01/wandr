@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dart run:*)",
+      "Bash(flutter analyze:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(sed:*)",
+      "Bash(npm run build:*)",
+      "Bash(firebase use:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(firebase functions:list:*)",
+      "Bash(firebase functions:config:get:*)",
+      "Bash(curl:*)",
+      "Bash(npm run deploy:*)",
+      "Bash(find:*)",
+      "Bash(rg:*)",
+      "Bash(flutter run:*)",
+      "Bash(grep:*)",
+      "Bash(flutter build:*)",
+      "Bash(flutter doctor:*)",
+      "Bash(flutter packages pub run build_runner build:*)"
+    ],
+    "deny": []
+  }
+}

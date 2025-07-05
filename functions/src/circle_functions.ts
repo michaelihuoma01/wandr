@@ -1,5 +1,5 @@
 // functions/src/circle_functions.ts
-import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
@@ -25,6 +25,20 @@ export const onCircleActivity = onDocumentCreated({document: 'circles/{circleId}
       if (!circleDoc.exists) return;
       
       const circle = circleDoc.data()!;
+
+       // Don't notify for reactions or comments on own activity
+    if (activity.type === 'reaction' || activity.type === 'comment') {
+      const targetActivityDoc = await db
+        .collection('circles')
+        .doc(circleId)
+        .collection('activity')
+        .doc(activity.data.activityId)
+        .get();
+      
+      if (targetActivityDoc.exists && targetActivityDoc.data()?.userId === activity.userId) {
+        return; // Don't notify users of reactions/comments on their own posts
+      }
+    }
 
       // Get all circle members except the actor
       const membersSnapshot = await db
@@ -454,6 +468,226 @@ export const generateCircleInsights = onSchedule(
   }
 );
 
+// Add new function for push notification setup:
+export const setupUserNotifications = onCall(
+  {
+    cors: true,
+  },
+  async (request) => {
+    const auth = request.auth;
+    if (!auth) {
+      throw new Error('User must be authenticated');
+    }
+
+    const { fcmToken } = request.data;
+
+    try {
+      await db.collection('users').doc(auth.uid).update({
+        fcmTokens: admin.firestore.FieldValue.arrayUnion(fcmToken),
+        lastTokenUpdate: admin.firestore.FieldValue.serverTimestamp(),
+        notificationsEnabled: true,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error setting up notifications:', error);
+      throw new Error('Failed to setup notifications');
+    }
+  }
+);
+
+export const onActivityInteraction = onDocumentUpdated(
+  {document: 'circles/{circleId}/activity/{activityId}'},
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    
+    if (!before || !after) return;
+    
+    const { circleId, activityId } = event.params;
+    
+    // Check for new reactions
+    const beforeReactions = before.reactions || {};
+    const afterReactions = after.reactions || {};
+    
+    for (const [emoji, users] of Object.entries(afterReactions)) {
+      const beforeUsers = beforeReactions[emoji] || [];
+      const newUsers = (users as string[]).filter(u => !beforeUsers.includes(u));
+      
+      for (const userId of newUsers) {
+        // Don't notify the activity creator if they react to their own post
+        if (userId === after.userId) continue;
+        
+        // Send notification to activity creator
+        await sendReactionNotification(
+          circleId,
+          activityId,
+          after.userId, // activity creator
+          userId, // reactor
+          emoji
+        );
+      }
+    }
+    
+    // Check for new comments
+    const beforeComments = before.comments || [];
+    const afterComments = after.comments || [];
+    
+    if (afterComments.length > beforeComments.length) {
+      const newComment = afterComments[afterComments.length - 1];
+      
+      // Don't notify if commenting on own post
+      if (newComment.userId !== after.userId) {
+        await sendCommentNotification(
+          circleId,
+          activityId,
+          after.userId, // activity creator
+          newComment
+        );
+      }
+    }
+  }
+);
+
+async function sendReactionNotification(
+  circleId: string,
+  activityId: string,
+  activityUserId: string,
+  reactorId: string,
+  emoji: string
+) {
+  try {
+    // Get reactor info
+    const reactorDoc = await db.collection('users').doc(reactorId).get();
+    const reactorName = reactorDoc.data()?.displayName || 'Someone';
+    
+    // Get circle info
+    const circleDoc = await db.collection('circles').doc(circleId).get();
+    const circleName = circleDoc.data()?.name || 'Circle';
+    
+    // Create notification
+    await db.collection('notifications')
+      .doc(activityUserId)
+      .collection('circle_notifications')
+      .add({
+        type: 'reaction',
+        circleId,
+        circleName,
+        activityId,
+        title: `New reaction in ${circleName}`,
+        body: `${reactorName} reacted ${emoji} to your post`,
+        isRead: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        data: {
+          reactorId,
+          emoji,
+        },
+      });
+    
+    // Send push notification
+    const userDoc = await db.collection('users').doc(activityUserId).get();
+    if (userDoc.exists && userDoc.data()?.fcmTokens) {
+      const tokens = userDoc.data()!.fcmTokens;
+      
+      await fcm.sendMulticast({
+        tokens,
+        notification: {
+          title: `New reaction in ${circleName}`,
+          body: `${reactorName} reacted ${emoji} to your post`,
+        },
+        data: {
+          type: 'reaction',
+          circleId,
+          activityId,
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'circle_activity',
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              badge: 1,
+              sound: 'default',
+            },
+          },
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Error sending reaction notification:', error);
+  }
+}
+
+async function sendCommentNotification(
+  circleId: string,
+  activityId: string,
+  activityUserId: string,
+  comment: any
+) {
+  try {
+    // Get circle info
+    const circleDoc = await db.collection('circles').doc(circleId).get();
+    const circleName = circleDoc.data()?.name || 'Circle';
+    
+    // Create notification
+    await db.collection('notifications')
+      .doc(activityUserId)
+      .collection('circle_notifications')
+      .add({
+        type: 'comment',
+        circleId,
+        circleName,
+        activityId,
+        title: `New comment in ${circleName}`,
+        body: `${comment.userName} commented: "${comment.text.substring(0, 50)}${comment.text.length > 50 ? '...' : ''}"`,
+        isRead: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        data: {
+          commenterId: comment.userId,
+          commentText: comment.text,
+        },
+      });
+    
+    // Send push notification
+    const userDoc = await db.collection('users').doc(activityUserId).get();
+    if (userDoc.exists && userDoc.data()?.fcmTokens) {
+      const tokens = userDoc.data()!.fcmTokens;
+      
+      await fcm.sendMulticast({
+        tokens,
+        notification: {
+          title: `New comment in ${circleName}`,
+          body: `${comment.userName}: ${comment.text.substring(0, 50)}${comment.text.length > 50 ? '...' : ''}`,
+        },
+        data: {
+          type: 'comment',
+          circleId,
+          activityId,
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'circle_activity',
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              badge: 1,
+              sound: 'default',
+            },
+          },
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Error sending comment notification:', error);
+  }
+}
+
 // Helper Functions
 function getNotificationTitle(activityType: string, circleName: string): string {
   const titles: Record<string, string> = {
@@ -463,6 +697,8 @@ function getNotificationTitle(activityType: string, circleName: string): string 
     microReview: `New review in ${circleName}`,
     memberJoined: `New member joined ${circleName}`,
     milestone: `${circleName} milestone!`,
+    reaction: `New reaction in ${circleName}`, // ADD
+    comment: `New comment in ${circleName}`, // ADD
   };
   return titles[activityType] || `Activity in ${circleName}`;
 }
@@ -475,6 +711,8 @@ function getNotificationBody(activity: any, userName: string): string {
     microReview: `${activity.userName} reviewed ${activity.data.placeName}`,
     memberJoined: `${activity.userName} joined the circle`,
     milestone: activity.data.message || 'Circle milestone achieved!',
+    reaction: `${activity.userName} reacted to your post`, // ADD
+    comment: `${activity.userName} commented on your post`, // ADD
   };
   return bodies[activity.type] || 'New activity in your circle';
 }
@@ -536,4 +774,6 @@ export const circleNotifications = {
   aggregateCirclePlaces,
   calculateVibeCompatibility,
   generateCircleInsights,
+  onActivityInteraction,
+  setupUserNotifications
 };

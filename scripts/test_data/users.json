@@ -1,0 +1,52 @@
+[
+  {
+    "uid": "user_alex_123",
+    "email": "alex@example.com",
+    "displayName": "Alex Chen",
+    "photoURL": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d",
+    "bio": "Food enthusiast and adventure seeker",
+    "location": "New York, NY",
+    "joinedAt": "2025-03-03T05:08:16.768062",
+    "isPublic": true
+  },
+  {
+    "uid": "user_sara_456",
+    "email": "sara@example.com",
+    "displayName": "Sara Johnson",
+    "photoURL": "https://images.unsplash.com/photo-1494790108755-2616b612b786",
+    "bio": "Art lover and coffee connoisseur",
+    "location": "Brooklyn, NY",
+    "joinedAt": "2025-03-28T05:08:16.768073",
+    "isPublic": true
+  },
+  {
+    "uid": "user_mike_789",
+    "email": "mike@example.com",
+    "displayName": "Mike Rodriguez",
+    "photoURL": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e",
+    "bio": "Night owl exploring the city's nightlife",
+    "location": "Manhattan, NY",
+    "joinedAt": "2025-04-25T05:08:16.768078",
+    "isPublic": false
+  },
+  {
+    "uid": "user_emma_012",
+    "email": "emma@example.com",
+    "displayName": "Emma Davis",
+    "photoURL": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80",
+    "bio": "Weekend warrior and outdoor enthusiast",
+    "location": "Queens, NY",
+    "joinedAt": "2025-05-17T05:08:16.768085",
+    "isPublic": true
+  },
+  {
+    "uid": "user_james_345",
+    "email": "james@example.com",
+    "displayName": "James Wilson",
+    "photoURL": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
+    "bio": "Cultural explorer and museum enthusiast",
+    "location": "Bronx, NY",
+    "joinedAt": "2025-04-14T05:08:16.768090",
+    "isPublic": true
+  }
+]

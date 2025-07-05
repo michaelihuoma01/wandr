@@ -27,23 +27,27 @@ class ActivityCommentsWidget extends StatefulWidget {
 class _ActivityCommentsWidgetState extends State<ActivityCommentsWidget> {
   final AuthService _authService = AuthService();
   final TextEditingController _commentController = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
   bool _isExpanded = false;
   bool _isSubmitting = false;
 
   @override
   void dispose() {
     _commentController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
   void _submitComment() async {
-    if (_commentController.text.trim().isEmpty) return;
+    final text = _commentController.text.trim();
+    if (text.isEmpty || _isSubmitting) return;
     
     setState(() => _isSubmitting = true);
     
     try {
-      await widget.onAddComment(_commentController.text.trim());
+      await widget.onAddComment(text);
       _commentController.clear();
+      _focusNode.unfocus();
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -78,56 +82,81 @@ class _ActivityCommentsWidgetState extends State<ActivityCommentsWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Comments section
+        // Comments count
         if (hasComments) ...[
+          InkWell(
+            onTap: () => setState(() => _isExpanded = !_isExpanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                _isExpanded 
+                    ? 'Hide comments'
+                    : 'View all ${widget.comments.length} comments',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).primaryColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          
+          // Comments list
           ...displayedComments.map((comment) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
-                  radius: 16,
+                  radius: 14,
+                  backgroundImage: comment.userPhotoUrl != null
+                      ? CachedNetworkImageProvider(comment.userPhotoUrl!)
+                      : null,
                   backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                  child: Text(
-                    comment.userName[0].toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).primaryColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: comment.userPhotoUrl == null
+                      ? Text(
+                          comment.userName[0].toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).primaryColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            comment.userName,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                      RichText(
+                        text: TextSpan(
+                          style: DefaultTextStyle.of(context).style,
+                          children: [
+                            TextSpan(
+                              text: comment.userName,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _formatTime(comment.timestamp),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[500],
+                            const TextSpan(text: ' '),
+                            TextSpan(
+                              text: comment.text,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[800],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
-                        comment.text,
+                        _formatTime(comment.timestamp),
                         style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[800],
-                          height: 1.4,
+                          fontSize: 11,
+                          color: Colors.grey[500],
                         ),
                       ),
                     ],
@@ -136,118 +165,73 @@ class _ActivityCommentsWidgetState extends State<ActivityCommentsWidget> {
               ],
             ),
           )),
-          
-          // View more comments button
-          if (widget.comments.length > 2 && !_isExpanded) ...[
-            InkWell(
-              onTap: () => setState(() => _isExpanded = true),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  'View ${widget.comments.length - 2} more comment${widget.comments.length - 2 > 1 ? 's' : ''}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(context).primaryColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ],
-          
-          if (_isExpanded && widget.comments.length > 2) ...[
-            InkWell(
-              onTap: () => setState(() => _isExpanded = false),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  'Show less',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(context).primaryColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
         
         // Add comment field
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-              backgroundImage: _authService.currentUser?.photoURL != null
-                  ? CachedNetworkImageProvider(_authService.currentUser!.photoURL!)
-                  : null,
-              child: _authService.currentUser?.photoURL == null
-                  ? Text(
-                      (_authService.currentUser?.displayName?[0] ?? 'U').toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Theme.of(context).primaryColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _commentController,
-                decoration: InputDecoration(
-                  hintText: 'Add a comment...',
-                  hintStyle: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[500],
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide(
-                      color: Theme.of(context).primaryColor.withOpacity(0.5),
-                      width: 2,
+        Container(
+          margin: const EdgeInsets.only(top: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _commentController,
+                  focusNode: _focusNode,
+                  maxLines: null,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _submitComment(),
+                  decoration: InputDecoration(
+                    hintText: 'Add a comment...',
+                    hintStyle: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[500],
                     ),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    isDense: true,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  isDense: true,
-                  suffixIcon: _isSubmitting
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : IconButton(
-                          icon: Icon(
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Material(
+                color: _commentController.text.trim().isEmpty
+                    ? Colors.grey[300]
+                    : Theme.of(context).primaryColor,
+                borderRadius: BorderRadius.circular(20),
+                child: InkWell(
+                  onTap: _submitComment,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(
                             Icons.send,
                             size: 20,
-                            color: Theme.of(context).primaryColor,
+                            color: Colors.white,
                           ),
-                          onPressed: _submitComment,
-                        ),
+                  ),
                 ),
-                style: const TextStyle(fontSize: 14),
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _submitComment(),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );

@@ -1,0 +1,1200 @@
+[
+  {
+    "id": "checkin_000",
+    "userId": "user_james_345",
+    "placeId": "place_metropolitan_museum",
+    "placeName": "Metropolitan Museum",
+    "placeType": "museum",
+    "latitude": 40.7794,
+    "longitude": -73.9632,
+    "timestamp": "2025-06-22T06:35:16.764702",
+    "rating": 3.242287757420776,
+    "review": "Amazing experience at Metropolitan Museum! The atmosphere was perfect and service was top-notch.",
+    "photos": [],
+    "tags": [
+      "solo",
+      "upscale"
+    ],
+    "isPublic": false,
+    "likeCount": 24,
+    "commentCount": 5,
+    "weather": "clear",
+    "mood": "energetic"
+  },
+  {
+    "id": "checkin_001",
+    "userId": "user_emma_012",
+    "placeId": "place_metropolitan_museum",
+    "placeName": "Metropolitan Museum",
+    "placeType": "museum",
+    "latitude": 40.7794,
+    "longitude": -73.9632,
+    "timestamp": "2025-06-18T08:06:16.765081",
+    "rating": 4.378367590546043,
+    "review": "This place has such a unique character. Loved every minute here.",
+    "photos": [
+      "https://images.unsplash.com/photo-1566127982909-9663b0b87edb"
+    ],
+    "tags": [
+      "indoor",
+      "evening"
+    ],
+    "isPublic": false,
+    "likeCount": 9,
+    "commentCount": 3,
+    "weather": "clear",
+    "mood": "relaxed"
+  },
+  {
+    "id": "checkin_002",
+    "userId": "user_emma_012",
+    "placeId": "place_central_park",
+    "placeName": "Central Park",
+    "placeType": "park",
+    "latitude": 40.7829,
+    "longitude": -73.9654,
+    "timestamp": "2025-06-30T07:27:16.765123",
+    "rating": 3.719839954249773,
+    "review": "Absolutely loved this place! Will definitely be coming back soon.",
+    "photos": [
+      "https://images.unsplash.com/photo-1572986945473-b2bc53b5bdcd"
+    ],
+    "tags": [
+      "local",
+      "casual"
+    ],
+    "isPublic": false,
+    "likeCount": 1,
+    "commentCount": 5,
+    "weather": "partly_cloudy",
+    "mood": "inspired"
+  },
+  {
+    "id": "checkin_003",
+    "userId": "user_sara_456",
+    "placeId": "place_central_park",
+    "placeName": "Central Park",
+    "placeType": "park",
+    "latitude": 40.7829,
+    "longitude": -73.9654,
+    "timestamp": "2025-06-20T02:16:16.765164",
+    "rating": 3.219453179431408,
+    "review": "Cozy atmosphere and friendly staff. Perfect for date night.",
+    "photos": [],
+    "tags": [
+      "art",
+      "casual"
+    ],
+    "isPublic": true,
+    "likeCount": 7,
+    "commentCount": 2,
+    "weather": "partly_cloudy",
+    "mood": "excited"
+  },
+  {
+    "id": "checkin_004",
+    "userId": "user_mike_789",
+    "placeId": "place_artisan_coffee_house",
+    "placeName": "Artisan Coffee House",
+    "placeType": "cafe",
+    "latitude": 40.7282,
+    "longitude": -73.9942,
+    "timestamp": "2025-06-28T23:03:16.765214",
+    "rating": 4.957655972875653,
+    "review": "Exceptional experience from start to finish. Five stars!",
+    "photos": [],
+    "tags": [
+      "family",
+      "weekend",
+      "outdoor",
+      "local",
+      "nature"
+    ],
+    "isPublic": true,
+    "likeCount": 21,
+    "commentCount": 5,
+    "weather": "clear",
+    "mood": "inspired"
+  },
+  {
+    "id": "checkin_005",
+    "userId": "user_mike_789",
+    "placeId": "place_blue_note_jazz_club",
+    "placeName": "Blue Note Jazz Club",
+    "placeType": "entertainment",
+    "latitude": 40.7295,
+    "longitude": -74.0009,
+    "timestamp": "2025-06-30T05:59:16.765254",
+    "rating": 3.864364600299867,
+    "review": "Amazing experience at Blue Note Jazz Club! The atmosphere was perfect and service was top-notch.",
+    "photos": [],
+    "tags": [
+      "group",
+      "upscale",
+      "indoor",
+      "date"
+    ],
+    "isPublic": false,
+    "likeCount": 19,
+    "commentCount": 6,
+    "weather": "rainy",
+    "mood": "relaxed"
+  },
+  {
+    "id": "checkin_006",
+    "userId": "user_alex_123",
+    "placeId": "place_metropolitan_museum",
+    "placeName": "Metropolitan Museum",
+    "placeType": "museum",
+    "latitude": 40.7794,
+    "longitude": -73.9632,
+    "timestamp": "2025-06-29T04:28:16.765305",
+    "rating": 3.871229743692152,
+    "review": "Amazing experience at Metropolitan Museum! The atmosphere was perfect and service was top-notch.",
+    "photos": [],
+    "tags": [
+      "romantic",
+      "upscale"
+    ],
+    "isPublic": true,
+    "likeCount": 1,
+    "commentCount": 6,
+    "weather": "cloudy",
+    "mood": "romantic"
+  },
+  {
+    "id": "checkin_007",
+    "userId": "user_mike_789",
+    "placeId": "place_blue_note_jazz_club",
+    "placeName": "Blue Note Jazz Club",
+    "placeType": "entertainment",
+    "latitude": 40.7295,
+    "longitude": -74.0009,
+    "timestamp": "2025-06-28T15:57:16.765344",
+    "rating": 4.399425358442364,
+    "review": "Amazing experience at Blue Note Jazz Club! The atmosphere was perfect and service was top-notch.",
+    "photos": [],
+    "tags": [
+      "coffee",
+      "nature",
+      "casual"
+    ],
+    "isPublic": false,
+    "likeCount": 4,
+    "commentCount": 4,
+    "weather": "partly_cloudy",
+    "mood": "inspired"
+  },
+  {
+    "id": "checkin_008",
+    "userId": "user_sara_456",
+    "placeId": "place_sunset_rooftop_bar",
+    "placeName": "Sunset Rooftop Bar",
+    "placeType": "bar",
+    "latitude": 40.7589,
+    "longitude": -73.9851,
+    "timestamp": "2025-06-23T08:27:16.765404",
+    "rating": 4.816135191808071,
+    "review": "Absolutely loved this place! Will definitely be coming back soon.",
+    "photos": [],
+    "tags": [
+      "group",
+      "afternoon",
+      "local"
+    ],
+    "isPublic": true,
+    "likeCount": 18,
+    "commentCount": 2,
+    "weather": "partly_cloudy",
+    "mood": "relaxed"
+  },
+  {
+    "id": "checkin_009",
+    "userId": "user_alex_123",
+    "placeId": "place_metropolitan_museum",
+    "placeName": "Metropolitan Museum",
+    "placeType": "museum",
+    "latitude": 40.7794,
+    "longitude": -73.9632,
+    "timestamp": "2025-06-20T13:17:16.765438",
+    "rating": 4.7792824406021435,
+    "review": "Perfect spot for a special occasion. Everything exceeded my expectations.",
+    "photos": [],
+    "tags": [
+      "casual",
+      "music",
+      "hidden"
+    ],
+    "isPublic": true,
+    "likeCount": 22,
+    "commentCount": 2,
+    "weather": "clear",
+    "mood": "romantic"
+  },
+  {
+    "id": "checkin_010",
+    "userId": "user_james_345",
+    "placeId": "place_sunset_rooftop_bar",
+    "placeName": "Sunset Rooftop Bar",
+    "placeType": "bar",
+    "latitude": 40.7589,
+    "longitude": -73.9851,
+    "timestamp": "2025-06-16T20:27:16.765472",
+    "rating": 3.551501586495137,
+    "review": "Perfect spot for a special occasion. Everything exceeded my expectations.",
+    "photos": [
+      "https://images.unsplash.com/photo-1574391884720-bfce7feac425"
+    ],
+    "tags": [
+      "night",
+      "local"
+    ],
+    "isPublic": true,
+    "likeCount": 6,
+    "commentCount": 5,
+    "weather": "cloudy",
+    "mood": "adventurous"
+  },
+  {
+    "id": "checkin_011",
+    "userId": "user_mike_789",
+    "placeId": "place_metropolitan_museum",
+    "placeName": "Metropolitan Museum",
+    "placeType": "museum",
+    "latitude": 40.7794,
+    "longitude": -73.9632,
+    "timestamp": "2025-06-30T06:31:16.765507",
+    "rating": 3.6272120457630916,
+    "review": "Exceptional experience from start to finish. Five stars!",
+    "photos": [],
+    "tags": [
+      "drinks",
+      "night",
+      "popular",
+      "food"
+    ],
+    "isPublic": false,
+    "likeCount": 9,
+    "commentCount": 7,
+    "weather": "clear",
+    "mood": "energetic"
+  },
+  {
+    "id": "checkin_012",
+    "userId": "user_emma_012",
+    "placeId": "place_artisan_coffee_house",
+    "placeName": "Artisan Coffee House",
+    "placeType": "cafe",
+    "latitude": 40.7282,
+    "longitude": -73.9942,
+    "timestamp": "2025-06-16T10:09:16.765542",
+    "rating": 4.2328479097917615,
+    "review": "Absolutely loved this place! Will definitely be coming back soon.",
+    "photos": [],
+    "tags": [
+      "weekend",
+      "popular",
+      "local",
+      "drinks",
+      "night"
+    ],
+    "isPublic": false,
+    "likeCount": 8,
+    "commentCount": 4,
+    "weather": "cloudy",
+    "mood": "energetic"
+  },
+  {
+    "id": "checkin_013",
+    "userId": "user_james_345",
+    "placeId": "place_artisan_coffee_house",
+    "placeName": "Artisan Coffee House",
+    "placeType": "cafe",
+    "latitude": 40.7282,
+    "longitude": -73.9942,
+    "timestamp": "2025-06-21T15:19:16.765577",
+    "rating": 3.8763246454072577,
+    "review": "This place has such a unique character. Loved every minute here.",
+    "photos": [
+      "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb"
+    ],
+    "tags": [
+      "evening",
+      "morning",
+      "weekend"
+    ],
+    "isPublic": false,
+    "likeCount": 2,
+    "commentCount": 5,
+    "weather": "clear",
+    "mood": "adventurous"
+  },
+  {
+    "id": "checkin_014",
+    "userId": "user_emma_012",
+    "placeId": "place_central_park",
+    "placeName": "Central Park",
+    "placeType": "park",
+    "latitude": 40.7829,
+    "longitude": -73.9654,
+    "timestamp": "2025-06-20T16:32:16.765613",
+    "rating": 3.5786893938271334,
+    "review": "Hidden gem alert! So glad I discovered Central Park.",
+    "photos": [
+      "https://images.unsplash.com/photo-1572986945473-b2bc53b5bdcd"
+    ],
+    "tags": [
+      "solo",
+      "art"
+    ],
+    "isPublic": false,
+    "likeCount": 1,
+    "commentCount": 7,
+    "weather": "clear",
+    "mood": "adventurous"
+  },
+  {
+    "id": "checkin_015",
+    "userId": "user_james_345",
+    "placeId": "place_corner_bistro",
+    "placeName": "Corner Bistro",
+    "placeType": "restaurant",
+    "latitude": 40.7505,
+    "longitude": -73.9934,
+    "timestamp": "2025-06-24T02:05:16.765645",
+    "rating": 4.788986105680371,
+    "review": "Perfect spot for a special occasion. Everything exceeded my expectations.",
+    "photos": [
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4"
+    ],
+    "tags": [
+      "local",
+      "drinks",
+      "family"
+    ],
+    "isPublic": true,
+    "likeCount": 12,
+    "commentCount": 4,
+    "weather": "cloudy",
+    "mood": "peaceful"
+  },
+  {
+    "id": "checkin_016",
+    "userId": "user_emma_012",
+    "placeId": "place_artisan_coffee_house",
+    "placeName": "Artisan Coffee House",
+    "placeType": "cafe",
+    "latitude": 40.7282,
+    "longitude": -73.9942,
+    "timestamp": "2025-06-23T19:59:16.765680",
+    "rating": 3.657485182083326,
+    "review": "This place has such a unique character. Loved every minute here.",
+    "photos": [
+      "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb"
+    ],
+    "tags": [
+      "popular",
+      "nature",
+      "evening"
+    ],
+    "isPublic": true,
+    "likeCount": 13,
+    "commentCount": 3,
+    "weather": "clear",
+    "mood": "romantic"
+  },
+  {
+    "id": "checkin_017",
+    "userId": "user_emma_012",
+    "placeId": "place_metropolitan_museum",
+    "placeName": "Metropolitan Museum",
+    "placeType": "museum",
+    "latitude": 40.7794,
+    "longitude": -73.9632,
+    "timestamp": "2025-07-01T03:41:16.765712",
+    "rating": 3.5663009733646445,
+    "review": "Cozy atmosphere and friendly staff. Perfect for date night.",
+    "photos": [],
+    "tags": [
+      "music",
+      "morning",
+      "hidden",
+      "solo",
+      "night"
+    ],
+    "isPublic": false,
+    "likeCount": 10,
+    "commentCount": 4,
+    "weather": "cloudy",
+    "mood": "adventurous"
+  },
+  {
+    "id": "checkin_018",
+    "userId": "user_mike_789",
+    "placeId": "place_central_park",
+    "placeName": "Central Park",
+    "placeType": "park",
+    "latitude": 40.7829,
+    "longitude": -73.9654,
+    "timestamp": "2025-06-29T20:36:16.765747",
+    "rating": 4.890342153517528,
+    "review": "This place has such a unique character. Loved every minute here.",
+    "photos": [],
+    "tags": [
+      "upscale",
+      "drinks",
+      "hidden"
+    ],
+    "isPublic": false,
+    "likeCount": 12,
+    "commentCount": 0,
+    "weather": "partly_cloudy",
+    "mood": "adventurous"
+  },
+  {
+    "id": "checkin_019",
+    "userId": "user_alex_123",
+    "placeId": "place_blue_note_jazz_club",
+    "placeName": "Blue Note Jazz Club",
+    "placeType": "entertainment",
+    "latitude": 40.7295,
+    "longitude": -74.0009,
+    "timestamp": "2025-06-23T19:37:16.765780",
+    "rating": 4.668653527202475,
+    "review": "Absolutely loved this place! Will definitely be coming back soon.",
+    "photos": [],
+    "tags": [
+      "outdoor",
+      "upscale",
+      "music",
+      "night",
+      "food"
+    ],
+    "isPublic": false,
+    "likeCount": 4,
+    "commentCount": 2,
+    "weather": "partly_cloudy",
+    "mood": "excited"
+  },
+  {
+    "id": "checkin_020",
+    "userId": "user_mike_789",
+    "placeId": "place_corner_bistro",
+    "placeName": "Corner Bistro",
+    "placeType": "restaurant",
+    "latitude": 40.7505,
+    "longitude": -73.9934,
+    "timestamp": "2025-06-19T12:56:16.765813",
+    "rating": 4.862688862788188,
+    "review": "Great food, great people, great time! What more could you ask for?",
+    "photos": [
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4"
+    ],
+    "tags": [
+      "date",
+      "drinks",
+      "night",
+      "popular",
+      "indoor"
+    ],
+    "isPublic": true,
+    "likeCount": 4,
+    "commentCount": 7,
+    "weather": "partly_cloudy",
+    "mood": "excited"
+  },
+  {
+    "id": "checkin_021",
+    "userId": "user_mike_789",
+    "placeId": "place_blue_note_jazz_club",
+    "placeName": "Blue Note Jazz Club",
+    "placeType": "entertainment",
+    "latitude": 40.7295,
+    "longitude": -74.0009,
+    "timestamp": "2025-06-26T10:39:16.765847",
+    "rating": 3.578000037835765,
+    "review": "Exceptional experience from start to finish. Five stars!",
+    "photos": [
+      "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f"
+    ],
+    "tags": [
+      "food",
+      "evening",
+      "romantic",
+      "afternoon",
+      "date"
+    ],
+    "isPublic": true,
+    "likeCount": 1,
+    "commentCount": 0,
+    "weather": "rainy",
+    "mood": "peaceful"
+  },
+  {
+    "id": "checkin_022",
+    "userId": "user_emma_012",
+    "placeId": "place_central_park",
+    "placeName": "Central Park",
+    "placeType": "park",
+    "latitude": 40.7829,
+    "longitude": -73.9654,
+    "timestamp": "2025-06-17T16:20:16.765947",
+    "rating": 4.929042352685253,
+    "review": "Amazing experience at Central Park! The atmosphere was perfect and service was top-notch.",
+    "photos": [],
+    "tags": [
+      "art",
+      "group"
+    ],
+    "isPublic": false,
+    "likeCount": 3,
+    "commentCount": 3,
+    "weather": "partly_cloudy",
+    "mood": "adventurous"
+  },
+  {
+    "id": "checkin_023",
+    "userId": "user_emma_012",
+    "placeId": "place_sunset_rooftop_bar",
+    "placeName": "Sunset Rooftop Bar",
+    "placeType": "bar",
+    "latitude": 40.7589,
+    "longitude": -73.9851,
+    "timestamp": "2025-06-19T17:49:16.765985",
+    "rating": 3.339441021310387,
+    "review": "This place has such a unique character. Loved every minute here.",
+    "photos": [],
+    "tags": [
+      "nature",
+      "food",
+      "group",
+      "art",
+      "hidden"
+    ],
+    "isPublic": true,
+    "likeCount": 22,
+    "commentCount": 6,
+    "weather": "rainy",
+    "mood": "relaxed"
+  },
+  {
+    "id": "checkin_024",
+    "userId": "user_alex_123",
+    "placeId": "place_sunset_rooftop_bar",
+    "placeName": "Sunset Rooftop Bar",
+    "placeType": "bar",
+    "latitude": 40.7589,
+    "longitude": -73.9851,
+    "timestamp": "2025-06-10T20:52:16.766060",
+    "rating": 4.669137180955175,
+    "review": "Exceptional experience from start to finish. Five stars!",
+    "photos": [],
+    "tags": [
+      "solo",
+      "drinks",
+      "night",
+      "food"
+    ],
+    "isPublic": true,
+    "likeCount": 17,
+    "commentCount": 6,
+    "weather": "rainy",
+    "mood": "relaxed"
+  },
+  {
+    "id": "checkin_025",
+    "userId": "user_james_345",
+    "placeId": "place_metropolitan_museum",
+    "placeName": "Metropolitan Museum",
+    "placeType": "museum",
+    "latitude": 40.7794,
+    "longitude": -73.9632,
+    "timestamp": "2025-06-30T09:05:16.766088",
+    "rating": 4.436684829322852,
+    "review": "This place has such a unique character. Loved every minute here.",
+    "photos": [],
+    "tags": [
+      "solo",
+      "music",
+      "weekend",
+      "hidden",
+      "upscale"
+    ],
+    "isPublic": false,
+    "likeCount": 3,
+    "commentCount": 7,
+    "weather": "rainy",
+    "mood": "energetic"
+  },
+  {
+    "id": "checkin_026",
+    "userId": "user_emma_012",
+    "placeId": "place_metropolitan_museum",
+    "placeName": "Metropolitan Museum",
+    "placeType": "museum",
+    "latitude": 40.7794,
+    "longitude": -73.9632,
+    "timestamp": "2025-06-21T19:52:16.766117",
+    "rating": 4.735160933451768,
+    "review": "Perfect spot for a special occasion. Everything exceeded my expectations.",
+    "photos": [
+      "https://images.unsplash.com/photo-1566127982909-9663b0b87edb"
+    ],
+    "tags": [
+      "date",
+      "upscale",
+      "food",
+      "hidden",
+      "romantic"
+    ],
+    "isPublic": true,
+    "likeCount": 0,
+    "commentCount": 6,
+    "weather": "sunny",
+    "mood": "energetic"
+  },
+  {
+    "id": "checkin_027",
+    "userId": "user_emma_012",
+    "placeId": "place_sunset_rooftop_bar",
+    "placeName": "Sunset Rooftop Bar",
+    "placeType": "bar",
+    "latitude": 40.7589,
+    "longitude": -73.9851,
+    "timestamp": "2025-06-09T16:09:16.766143",
+    "rating": 4.123105658377334,
+    "review": "Cozy atmosphere and friendly staff. Perfect for date night.",
+    "photos": [],
+    "tags": [
+      "nature",
+      "art",
+      "afternoon"
+    ],
+    "isPublic": false,
+    "likeCount": 16,
+    "commentCount": 1,
+    "weather": "partly_cloudy",
+    "mood": "social"
+  },
+  {
+    "id": "checkin_028",
+    "userId": "user_emma_012",
+    "placeId": "place_blue_note_jazz_club",
+    "placeName": "Blue Note Jazz Club",
+    "placeType": "entertainment",
+    "latitude": 40.7295,
+    "longitude": -74.0009,
+    "timestamp": "2025-06-29T11:53:16.766171",
+    "rating": 4.540362209309409,
+    "review": "Exceptional experience from start to finish. Five stars!",
+    "photos": [],
+    "tags": [
+      "group",
+      "food"
+    ],
+    "isPublic": false,
+    "likeCount": 0,
+    "commentCount": 2,
+    "weather": "cloudy",
+    "mood": "energetic"
+  },
+  {
+    "id": "checkin_029",
+    "userId": "user_alex_123",
+    "placeId": "place_corner_bistro",
+    "placeName": "Corner Bistro",
+    "placeType": "restaurant",
+    "latitude": 40.7505,
+    "longitude": -73.9934,
+    "timestamp": "2025-06-29T17:51:16.766196",
+    "rating": 3.6393043762080826,
+    "review": "Absolutely loved this place! Will definitely be coming back soon.",
+    "photos": [],
+    "tags": [
+      "local",
+      "weekend"
+    ],
+    "isPublic": false,
+    "likeCount": 17,
+    "commentCount": 5,
+    "weather": "partly_cloudy",
+    "mood": "excited"
+  },
+  {
+    "id": "checkin_030",
+    "userId": "user_emma_012",
+    "placeId": "place_corner_bistro",
+    "placeName": "Corner Bistro",
+    "placeType": "restaurant",
+    "latitude": 40.7505,
+    "longitude": -73.9934,
+    "timestamp": "2025-06-12T10:42:16.766222",
+    "rating": 3.682441187373511,
+    "review": "Outstanding quality and attention to detail. Highly recommend!",
+    "photos": [
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4"
+    ],
+    "tags": [
+      "upscale",
+      "outdoor",
+      "food"
+    ],
+    "isPublic": true,
+    "likeCount": 0,
+    "commentCount": 0,
+    "weather": "cloudy",
+    "mood": "social"
+  },
+  {
+    "id": "checkin_031",
+    "userId": "user_james_345",
+    "placeId": "place_blue_note_jazz_club",
+    "placeName": "Blue Note Jazz Club",
+    "placeType": "entertainment",
+    "latitude": 40.7295,
+    "longitude": -74.0009,
+    "timestamp": "2025-06-26T14:42:16.766248",
+    "rating": 3.8730698390874965,
+    "review": "This place has such a unique character. Loved every minute here.",
+    "photos": [],
+    "tags": [
+      "weekend",
+      "night",
+      "upscale"
+    ],
+    "isPublic": true,
+    "likeCount": 12,
+    "commentCount": 7,
+    "weather": "partly_cloudy",
+    "mood": "social"
+  },
+  {
+    "id": "checkin_032",
+    "userId": "user_emma_012",
+    "placeId": "place_blue_note_jazz_club",
+    "placeName": "Blue Note Jazz Club",
+    "placeType": "entertainment",
+    "latitude": 40.7295,
+    "longitude": -74.0009,
+    "timestamp": "2025-06-12T22:35:16.766275",
+    "rating": 4.920706572758847,
+    "review": "Beautiful location with incredible vibes. A must-visit!",
+    "photos": [],
+    "tags": [
+      "night",
+      "evening",
+      "solo",
+      "hidden",
+      "group"
+    ],
+    "isPublic": true,
+    "likeCount": 18,
+    "commentCount": 4,
+    "weather": "cloudy",
+    "mood": "excited"
+  },
+  {
+    "id": "checkin_033",
+    "userId": "user_alex_123",
+    "placeId": "place_sunset_rooftop_bar",
+    "placeName": "Sunset Rooftop Bar",
+    "placeType": "bar",
+    "latitude": 40.7589,
+    "longitude": -73.9851,
+    "timestamp": "2025-06-22T05:08:16.766366",
+    "rating": 3.1293289592558544,
+    "review": "Exceptional experience from start to finish. Five stars!",
+    "photos": [],
+    "tags": [
+      "morning",
+      "food"
+    ],
+    "isPublic": false,
+    "likeCount": 8,
+    "commentCount": 3,
+    "weather": "partly_cloudy",
+    "mood": "inspired"
+  },
+  {
+    "id": "checkin_034",
+    "userId": "user_james_345",
+    "placeId": "place_metropolitan_museum",
+    "placeName": "Metropolitan Museum",
+    "placeType": "museum",
+    "latitude": 40.7794,
+    "longitude": -73.9632,
+    "timestamp": "2025-06-07T22:36:16.766391",
+    "rating": 3.9545120049807854,
+    "review": "Perfect spot for a special occasion. Everything exceeded my expectations.",
+    "photos": [],
+    "tags": [
+      "romantic",
+      "food",
+      "weekend",
+      "casual",
+      "morning"
+    ],
+    "isPublic": true,
+    "likeCount": 7,
+    "commentCount": 7,
+    "weather": "cloudy",
+    "mood": "social"
+  },
+  {
+    "id": "checkin_035",
+    "userId": "user_mike_789",
+    "placeId": "place_sunset_rooftop_bar",
+    "placeName": "Sunset Rooftop Bar",
+    "placeType": "bar",
+    "latitude": 40.7589,
+    "longitude": -73.9851,
+    "timestamp": "2025-06-30T11:55:16.766414",
+    "rating": 3.336739085629653,
+    "review": "Outstanding quality and attention to detail. Highly recommend!",
+    "photos": [
+      "https://images.unsplash.com/photo-1574391884720-bfce7feac425"
+    ],
+    "tags": [
+      "music",
+      "casual",
+      "art",
+      "evening"
+    ],
+    "isPublic": true,
+    "likeCount": 1,
+    "commentCount": 3,
+    "weather": "sunny",
+    "mood": "energetic"
+  },
+  {
+    "id": "checkin_036",
+    "userId": "user_sara_456",
+    "placeId": "place_blue_note_jazz_club",
+    "placeName": "Blue Note Jazz Club",
+    "placeType": "entertainment",
+    "latitude": 40.7295,
+    "longitude": -74.0009,
+    "timestamp": "2025-06-25T02:33:16.766444",
+    "rating": 4.681256384553339,
+    "review": "Outstanding quality and attention to detail. Highly recommend!",
+    "photos": [],
+    "tags": [
+      "coffee",
+      "group",
+      "date"
+    ],
+    "isPublic": true,
+    "likeCount": 15,
+    "commentCount": 7,
+    "weather": "cloudy",
+    "mood": "adventurous"
+  },
+  {
+    "id": "checkin_037",
+    "userId": "user_emma_012",
+    "placeId": "place_blue_note_jazz_club",
+    "placeName": "Blue Note Jazz Club",
+    "placeType": "entertainment",
+    "latitude": 40.7295,
+    "longitude": -74.0009,
+    "timestamp": "2025-06-26T11:25:16.766468",
+    "rating": 3.677796561306916,
+    "review": "Beautiful location with incredible vibes. A must-visit!",
+    "photos": [
+      "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f"
+    ],
+    "tags": [
+      "food",
+      "romantic"
+    ],
+    "isPublic": true,
+    "likeCount": 18,
+    "commentCount": 7,
+    "weather": "rainy",
+    "mood": "inspired"
+  },
+  {
+    "id": "checkin_038",
+    "userId": "user_emma_012",
+    "placeId": "place_artisan_coffee_house",
+    "placeName": "Artisan Coffee House",
+    "placeType": "cafe",
+    "latitude": 40.7282,
+    "longitude": -73.9942,
+    "timestamp": "2025-06-17T13:13:16.766493",
+    "rating": 3.6058337546768833,
+    "review": "Great food, great people, great time! What more could you ask for?",
+    "photos": [],
+    "tags": [
+      "art",
+      "food"
+    ],
+    "isPublic": false,
+    "likeCount": 11,
+    "commentCount": 2,
+    "weather": "rainy",
+    "mood": "peaceful"
+  },
+  {
+    "id": "checkin_039",
+    "userId": "user_sara_456",
+    "placeId": "place_central_park",
+    "placeName": "Central Park",
+    "placeType": "park",
+    "latitude": 40.7829,
+    "longitude": -73.9654,
+    "timestamp": "2025-06-28T08:12:16.766517",
+    "rating": 4.968196561636193,
+    "review": "Absolutely loved this place! Will definitely be coming back soon.",
+    "photos": [
+      "https://images.unsplash.com/photo-1572986945473-b2bc53b5bdcd"
+    ],
+    "tags": [
+      "family",
+      "hidden",
+      "group"
+    ],
+    "isPublic": true,
+    "likeCount": 20,
+    "commentCount": 1,
+    "weather": "partly_cloudy",
+    "mood": "inspired"
+  },
+  {
+    "id": "checkin_040",
+    "userId": "user_mike_789",
+    "placeId": "place_sunset_rooftop_bar",
+    "placeName": "Sunset Rooftop Bar",
+    "placeType": "bar",
+    "latitude": 40.7589,
+    "longitude": -73.9851,
+    "timestamp": "2025-06-19T03:05:16.766572",
+    "rating": 3.4219738715184604,
+    "review": "Outstanding quality and attention to detail. Highly recommend!",
+    "photos": [],
+    "tags": [
+      "afternoon",
+      "nature",
+      "upscale"
+    ],
+    "isPublic": false,
+    "likeCount": 1,
+    "commentCount": 0,
+    "weather": "sunny",
+    "mood": "energetic"
+  },
+  {
+    "id": "checkin_041",
+    "userId": "user_sara_456",
+    "placeId": "place_corner_bistro",
+    "placeName": "Corner Bistro",
+    "placeType": "restaurant",
+    "latitude": 40.7505,
+    "longitude": -73.9934,
+    "timestamp": "2025-06-30T16:54:16.766618",
+    "rating": 4.090022799821878,
+    "review": "Cozy atmosphere and friendly staff. Perfect for date night.",
+    "photos": [
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4"
+    ],
+    "tags": [
+      "coffee",
+      "upscale",
+      "food"
+    ],
+    "isPublic": true,
+    "likeCount": 9,
+    "commentCount": 0,
+    "weather": "sunny",
+    "mood": "relaxed"
+  },
+  {
+    "id": "checkin_042",
+    "userId": "user_sara_456",
+    "placeId": "place_corner_bistro",
+    "placeName": "Corner Bistro",
+    "placeType": "restaurant",
+    "latitude": 40.7505,
+    "longitude": -73.9934,
+    "timestamp": "2025-06-29T09:55:16.766649",
+    "rating": 3.8650985979334216,
+    "review": "Great food, great people, great time! What more could you ask for?",
+    "photos": [
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4"
+    ],
+    "tags": [
+      "upscale",
+      "afternoon"
+    ],
+    "isPublic": false,
+    "likeCount": 21,
+    "commentCount": 2,
+    "weather": "rainy",
+    "mood": "relaxed"
+  },
+  {
+    "id": "checkin_043",
+    "userId": "user_sara_456",
+    "placeId": "place_sunset_rooftop_bar",
+    "placeName": "Sunset Rooftop Bar",
+    "placeType": "bar",
+    "latitude": 40.7589,
+    "longitude": -73.9851,
+    "timestamp": "2025-06-14T00:06:16.766676",
+    "rating": 4.995358026002388,
+    "review": "Outstanding quality and attention to detail. Highly recommend!",
+    "photos": [],
+    "tags": [
+      "group",
+      "food",
+      "date"
+    ],
+    "isPublic": false,
+    "likeCount": 11,
+    "commentCount": 3,
+    "weather": "rainy",
+    "mood": "relaxed"
+  },
+  {
+    "id": "checkin_044",
+    "userId": "user_mike_789",
+    "placeId": "place_metropolitan_museum",
+    "placeName": "Metropolitan Museum",
+    "placeType": "museum",
+    "latitude": 40.7794,
+    "longitude": -73.9632,
+    "timestamp": "2025-06-23T17:30:16.766700",
+    "rating": 3.7994485452538047,
+    "review": "Amazing experience at Metropolitan Museum! The atmosphere was perfect and service was top-notch.",
+    "photos": [
+      "https://images.unsplash.com/photo-1566127982909-9663b0b87edb"
+    ],
+    "tags": [
+      "romantic",
+      "music"
+    ],
+    "isPublic": false,
+    "likeCount": 14,
+    "commentCount": 2,
+    "weather": "sunny",
+    "mood": "excited"
+  },
+  {
+    "id": "checkin_045",
+    "userId": "user_alex_123",
+    "placeId": "place_central_park",
+    "placeName": "Central Park",
+    "placeType": "park",
+    "latitude": 40.7829,
+    "longitude": -73.9654,
+    "timestamp": "2025-06-06T05:27:16.766724",
+    "rating": 4.575169410344008,
+    "review": "Cozy atmosphere and friendly staff. Perfect for date night.",
+    "photos": [],
+    "tags": [
+      "weekend",
+      "morning",
+      "solo",
+      "food"
+    ],
+    "isPublic": true,
+    "likeCount": 2,
+    "commentCount": 1,
+    "weather": "clear",
+    "mood": "romantic"
+  },
+  {
+    "id": "checkin_046",
+    "userId": "user_mike_789",
+    "placeId": "place_corner_bistro",
+    "placeName": "Corner Bistro",
+    "placeType": "restaurant",
+    "latitude": 40.7505,
+    "longitude": -73.9934,
+    "timestamp": "2025-06-30T14:42:16.766747",
+    "rating": 4.343209424855632,
+    "review": "Hidden gem alert! So glad I discovered Corner Bistro.",
+    "photos": [],
+    "tags": [
+      "night",
+      "afternoon"
+    ],
+    "isPublic": false,
+    "likeCount": 10,
+    "commentCount": 0,
+    "weather": "partly_cloudy",
+    "mood": "romantic"
+  },
+  {
+    "id": "checkin_047",
+    "userId": "user_emma_012",
+    "placeId": "place_corner_bistro",
+    "placeName": "Corner Bistro",
+    "placeType": "restaurant",
+    "latitude": 40.7505,
+    "longitude": -73.9934,
+    "timestamp": "2025-06-30T21:44:16.766771",
+    "rating": 3.2483627853423944,
+    "review": "This place has such a unique character. Loved every minute here.",
+    "photos": [],
+    "tags": [
+      "hidden",
+      "indoor",
+      "popular",
+      "family",
+      "afternoon"
+    ],
+    "isPublic": false,
+    "likeCount": 12,
+    "commentCount": 2,
+    "weather": "sunny",
+    "mood": "adventurous"
+  },
+  {
+    "id": "checkin_048",
+    "userId": "user_emma_012",
+    "placeId": "place_metropolitan_museum",
+    "placeName": "Metropolitan Museum",
+    "placeType": "museum",
+    "latitude": 40.7794,
+    "longitude": -73.9632,
+    "timestamp": "2025-06-30T23:01:16.766833",
+    "rating": 4.811753710718039,
+    "review": "Absolutely loved this place! Will definitely be coming back soon.",
+    "photos": [
+      "https://images.unsplash.com/photo-1566127982909-9663b0b87edb"
+    ],
+    "tags": [
+      "weekend",
+      "drinks",
+      "romantic"
+    ],
+    "isPublic": false,
+    "likeCount": 8,
+    "commentCount": 3,
+    "weather": "partly_cloudy",
+    "mood": "excited"
+  },
+  {
+    "id": "checkin_049",
+    "userId": "user_emma_012",
+    "placeId": "place_corner_bistro",
+    "placeName": "Corner Bistro",
+    "placeType": "restaurant",
+    "latitude": 40.7505,
+    "longitude": -73.9934,
+    "timestamp": "2025-06-21T05:23:16.766858",
+    "rating": 3.5875618030419596,
+    "review": "Cozy atmosphere and friendly staff. Perfect for date night.",
+    "photos": [],
+    "tags": [
+      "group",
+      "indoor"
+    ],
+    "isPublic": true,
+    "likeCount": 2,
+    "commentCount": 5,
+    "weather": "cloudy",
+    "mood": "romantic"
+  }
+]

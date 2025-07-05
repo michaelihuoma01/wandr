@@ -5,7 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:myapp/models/models.dart';
 import 'package:myapp/screens/circles/circles_list_screen.dart';
 import 'package:myapp/screens/history_screen.dart';
-import 'package:myapp/screens/visit_history_screen.dart';
+import 'package:myapp/screens/vibe_quiz_screen.dart';
+import 'package:myapp/widgets/admin_test_data_panel.dart';
 
 import '../services/auth_service.dart';
 import '../services/location_service.dart';
@@ -15,6 +16,7 @@ import '../widgets/place_card.dart';
 import '../widgets/search_history_item.dart';
 import '../widgets/search_filter_sheet.dart';
 import 'welcome_screen.dart';
+import 'enhanced_profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -40,6 +42,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<PlaceDetails> _searchResults = [];
   List<PlaceDetails> _filteredResults = [];
   List<SearchHistory> _recentSearches = [];
+  List<PlaceDetails> _discoverPlaces = [];
+  bool _isLoadingDiscoverPlaces = false;
   bool _isLoading = false;
   String? _errorMessage;
   String _userName = 'User';
@@ -53,6 +57,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   File? _selectedImage;
   bool _isImageSearch = false;
   SearchFilter _currentFilter = SearchFilter();
+  bool _isSearchFocused = false; // Track if search field is focused
 
   @override
   void initState() {
@@ -77,6 +82,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     await _loadLocation();
     await _loadRecentSearches();
     await _checkTrackingStatus();
+    await _loadDiscoverPlaces();
   }
 
   Future<void> _loadUserName() async {
@@ -509,6 +515,283 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _loadDiscoverPlaces() async {
+    if (_locationService.currentPosition == null) {
+      return;
+    }
+
+    setState(() => _isLoadingDiscoverPlaces = true);
+
+    try {
+      final timeOfDay = _getTimeOfDayCategory();
+      final vibeQuery = _getVibeQueryForTimeAndLocation(timeOfDay);
+      
+      final result = await _searchService.searchPlaces(
+        query: vibeQuery,
+        latitude: _locationService.currentPosition!.latitude,
+        longitude: _locationService.currentPosition!.longitude,
+        radiusKm: 10.0, // Smaller radius for discover places
+      );
+
+      if (mounted && result.success) {
+        setState(() {
+          _discoverPlaces = result.locations.take(6).toList(); // Limit to 6 places
+        });
+      }
+    } catch (e) {
+      // Log error but don't crash the app
+      debugPrint('Error loading discover places: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingDiscoverPlaces = false);
+      }
+    }
+  }
+
+  String _getTimeOfDayCategory() {
+    final hour = DateTime.now().hour;
+    if (hour >= 6 && hour < 11) {
+      return 'morning';
+    } else if (hour >= 11 && hour < 16) {
+      return 'midday';
+    } else if (hour >= 16 && hour < 19) {
+      return 'evening';
+    } else {
+      return 'night';
+    }
+  }
+
+  String _getVibeQueryForTimeAndLocation(String timeOfDay) {
+    final cityName = _locationService.currentCity;
+    final dayOfWeek = DateTime.now().weekday;
+    final isSunday = dayOfWeek == 7;
+    
+    switch (timeOfDay) {
+      case 'morning':
+        if (isSunday) {
+          return 'beach cafes brunch spots $cityName';
+        }
+        return 'breakfast cafes coffee shops $cityName';
+      case 'midday':
+        return 'lunch spots business lunch cafes $cityName';
+      case 'evening':
+        return 'sunset spots romantic restaurants $cityName';
+      case 'night':
+        return 'dinner restaurants lounges bars $cityName';
+      default:
+        return 'popular places $cityName';
+    }
+  }
+
+  Widget _buildDiscoverPlacesSection() {
+    final timeOfDay = _getTimeOfDayCategory();
+    final sectionTitle = _getDiscoverSectionTitle(timeOfDay);
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    sectionTitle,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  Text(
+                    _locationService.currentCity,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+              IconButton(
+                onPressed: _loadDiscoverPlaces,
+                icon: Icon(
+                  Icons.refresh,
+                  color: Theme.of(context).primaryColor,
+                ),
+                tooltip: 'Refresh suggestions',
+              ),
+            ],
+          ),
+        ),
+        if (_isLoadingDiscoverPlaces)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (_discoverPlaces.isNotEmpty)
+          SizedBox(
+            height: 220,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _discoverPlaces.length,
+              itemBuilder: (context, index) {
+                return Container(
+                  width: 160,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: _buildDiscoverPlaceCard(_discoverPlaces[index]),
+                );
+              },
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.all(32),
+            child: Center(
+              child: Text(
+                'No suggestions available',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _getDiscoverSectionTitle(String timeOfDay) {
+    final dayOfWeek = DateTime.now().weekday;
+    final isSunday = dayOfWeek == 7;
+    
+    switch (timeOfDay) {
+      case 'morning':
+        if (isSunday) {
+          return 'Sunday Morning Vibes';
+        }
+        return 'Morning Fuel';
+      case 'midday':
+        return 'Midday Picks';
+      case 'evening':
+        return 'Evening Magic';
+      case 'night':
+        return 'Night Scene';
+      default:
+        return 'Suggested for You';
+    }
+  }
+
+  Widget _buildDiscoverPlaceCard(PlaceDetails place) {
+    final distance = _locationService.calculateDistance(
+      _locationService.currentPosition!.latitude,
+      _locationService.currentPosition!.longitude,
+      place.latitude,
+      place.longitude,
+    );
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            child: Container(
+              height: 100,
+              width: double.infinity,
+              color: Colors.grey[200],
+              child: place.imageUrls != null && place.imageUrls!.isNotEmpty
+                  ? Image.network(
+                      _searchService.processImageUrl(place.imageUrls!.first),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[200],
+                          child: Icon(Icons.place, color: Colors.grey[400], size: 40),
+                        );
+                      },
+                    )
+                  : Icon(Icons.place, color: Colors.grey[400], size: 40),
+            ),
+          ),
+          // Content
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    place.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      if (place.rating != null) ...[ 
+                        Icon(Icons.star, size: 12, color: Colors.amber),
+                        const SizedBox(width: 2),
+                        Text(
+                          place.rating!.toStringAsFixed(1),
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Icon(Icons.location_on, size: 12, color: Colors.grey[600]),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${distance.toStringAsFixed(1)}km',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        // Navigate to place details or add to search results
+                        setState(() {
+                          _searchResults = [place];
+                          _filteredResults = [place];
+                          _currentQuery = place.name;
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
+                      child: const Text('View'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showVibeGenerator() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const VibeQuizScreen(),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
@@ -518,7 +801,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GestureDetector(
+      onTap: () {
+        FocusScope.of(context).unfocus();
+        setState(() {
+          _isSearchFocused = false;
+        });
+      },
+      child: Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: _selectedIndex == 0 ? AppBar(
         title: const Text('Wandr'),
@@ -557,17 +847,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => HistoryScreen(
-                    onSearchSelected: (query) {
-                      Navigator.pop(context);
-                      _performSearch(query);
-                    },
-                  ),
-                ),
-              );
+              // Navigator.push(
+              //   context,
+              //   MaterialPageRoute(
+              //     builder: (context) => HistoryScreen(
+              //       onSearchSelected: (query) {
+              //         Navigator.pop(context);
+              //         _performSearch(query);
+              //       },
+              //     ),
+              //   ),
+              // );
+               Navigator.push(context, MaterialPageRoute(
+    builder: (context) => AdminTestDataPanel(),
+  ));
             },
           ),
           IconButton(
@@ -592,8 +885,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
              // Circles screen
             const CirclesListScreen(),
-            // Visit history screen
-            const VisitHistoryScreen(),
+            // Enhanced Profile screen
+            const EnhancedProfileScreen(),
           ],
         ),
       ),
@@ -614,12 +907,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             label: 'Circles',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'My Journey',
+            icon: Icon(Icons.person),
+            label: 'Profile',
           ),
         ],
         selectedItemColor: Theme.of(context).primaryColor,
         unselectedItemColor: Colors.grey,
+      ),
       ),
     );
   }
@@ -653,21 +947,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     letterSpacing: -1,
                   ),
                   overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'AI Powered',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Theme.of(context).primaryColor,
-                    fontWeight: FontWeight.w600,
-                  ),
                 ),
               ),
             ],
@@ -795,6 +1074,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
                   ),
                   onSubmitted: (_) => _performSearch(),
+                  onTap: () {
+                    setState(() {
+                      _isSearchFocused = true;
+                    });
+                  },
+                  onChanged: (value) {
+                    if (value.isEmpty) {
+                      setState(() {
+                        _isSearchFocused = false;
+                      });
+                    }
+                  },
                 ),
               ),
               // Image picker button
@@ -959,8 +1250,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildContent() {
     if (_filteredResults.isNotEmpty || (_searchResults.isNotEmpty && _currentFilter.hasActiveFilters)) {
       return _buildSearchResults();
-    } else if (_recentSearches.isNotEmpty && !_isLoading) {
-      return _buildRecentSearches();
+    } else if (_isSearchFocused && _recentSearches.isNotEmpty && !_isLoading) {
+      return _buildRecentSearchesOnly();
+    } else if (!_isLoading) {
+      return _buildMainContent();
     } else {
       return _buildEmptyState();
     }
@@ -1103,7 +1396,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildRecentSearches() {
+  Widget _buildRecentSearchesOnly() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1139,18 +1432,124 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ],
           ),
         ),
+        // Show only first 3 recent searches
         Expanded(
           child: ListView.builder(
-            itemCount: _recentSearches.length,
+            itemCount: _recentSearches.take(3).length,
             itemBuilder: (context, index) {
+              final search = _recentSearches[index];
               return SearchHistoryItem(
-                history: _recentSearches[index],
-                onTap: () => _performSearch(_recentSearches[index].query),
+                history: search,
+                onTap: () {
+                  setState(() {
+                    _isSearchFocused = false;
+                  });
+                  _performSearch(search.query);
+                },
               );
             },
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMainContent() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Standalone Vibe Generator Button
+          _buildVibeGeneratorSection(),
+          
+          // Discover Places Section
+          _buildDiscoverPlacesSection(),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildVibeGeneratorSection() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Theme.of(context).primaryColor.withOpacity(0.1),
+            Theme.of(context).primaryColor.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).primaryColor.withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).primaryColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.auto_awesome,
+                  color: Theme.of(context).primaryColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Vibe List Generator',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Create personalized itineraries based on your mood and preferences',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _showVibeGenerator,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Generate My Vibe List'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

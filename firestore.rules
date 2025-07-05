@@ -1,224 +1,221 @@
-// Complete Firestore Security Rules for Wandr App with Social Vibe Circles
-
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-    
-    function isCircleMember(circleId) {
-      return isAuthenticated() && 
-        exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid));
-    }
-    
-    function getCircleMembership(circleId, userId) {
-      return get(/databases/$(database)/documents/circles/$(circleId)/members/$(userId));
-    }
-    
-    function isCircleAdmin(circleId) {
-      return isAuthenticated() && 
-        getCircleMembership(circleId, request.auth.uid).data.role == 'admin';
-    }
-    
-    function isCircleModerator(circleId) {
-      return isAuthenticated() && 
-        getCircleMembership(circleId, request.auth.uid).data.role in ['admin', 'moderator'];
-    }
-    
-    function isPublicCircle(circleId) {
-      return get(/databases/$(database)/documents/circles/$(circleId)).data.isPublic == true;
-    }
-    
-    // Users collection
+
+    // This rule allows anyone with your Firestore database reference to view, edit,
+    // and delete all data in your Firestore database. It is useful for getting
+    // started, but it is configured to expire after 30 days because it
+    // leaves your app open to attackers. At that time, all client
+    // requests to your Firestore database will be denied.
+    //
+    // Make sure to write security rules for your app before that time, or else
+    // all client requests to your Firestore database will be denied until you Update
+    // your rules
+    // Enhanced Users collection with privacy controls
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if false; // Never allow deletion
+      // Users can always read and write their own data
+      allow read, write: if request.auth != null && request.auth.uid == userId;
       
-      // User's circles subcollection
-      match /circles/{circleId} {
-        allow read: if isOwner(userId);
-        allow write: if isOwner(userId);
-      }
+      // Other users can read based on privacy settings
+      allow read: if request.auth != null && 
+                 request.auth.uid != userId &&
+                 canReadUserProfile(userId, request.auth.uid);
+      
+      // Validate enhanced user data structure on writes
+      allow write: if request.auth != null && 
+                  request.auth.uid == userId &&
+                  validateEnhancedUserData(request.resource.data);
     }
-    
-    // Visits collection (check-ins)
-    match /visits/{visitId} {
-      allow read: if isAuthenticated() && 
-        (resource.data.userId == request.auth.uid || 
-         (resource.data.circleId != null && isCircleMember(resource.data.circleId)));
-      allow create: if isAuthenticated() && 
-        request.resource.data.userId == request.auth.uid;
-      allow update: if isOwner(resource.data.userId);
-      allow delete: if isOwner(resource.data.userId);
-    }
-    
+
     // Circles collection
     match /circles/{circleId} {
-      // Allow read if circle is public or user is a member
-      allow read: if isPublicCircle(circleId) || isCircleMember(circleId);
-      
-      // Allow create if authenticated
-      allow create: if isAuthenticated() && 
-        request.resource.data.creatorId == request.auth.uid &&
-        request.resource.data.memberCount == 1;
-      
-      // Allow update only by admin
-      allow update: if isCircleAdmin(circleId) &&
-        // Prevent changing creator
-        (!('creatorId' in request.resource.data) || 
-         request.resource.data.creatorId == resource.data.creatorId);
-      
-      // Allow delete only by creator
-      allow delete: if isOwner(resource.data.creatorId);
-      
-      // Members subcollection
-      match /members/{memberId} {
-        // Allow read if user is a member of the circle
-        allow read: if isCircleMember(circleId);
-        
-        // Allow create if:
-        // 1. User is joining themselves (member role only)
-        // 2. Admin is adding someone
-        allow create: if isAuthenticated() && 
-          ((memberId == request.auth.uid && 
-            request.resource.data.role == 'member' &&
-            request.resource.data.userId == request.auth.uid) ||
-           isCircleAdmin(circleId));
-        
-        // Allow update by admin or self (for notification settings)
-        allow update: if isCircleAdmin(circleId) || 
-          (memberId == request.auth.uid && 
-           request.resource.data.role == resource.data.role);
-        
-        // Allow delete by admin or self (leaving circle)
-        allow delete: if isCircleAdmin(circleId) || memberId == request.auth.uid;
-      }
-      
-      // Activity subcollection
-      match /activity/{activityId} {
-        // Allow read if member
-        allow read: if isCircleMember(circleId);
-        
-        // Allow create if member and activity is by them
-        allow create: if isCircleMember(circleId) && 
-          request.resource.data.userId == request.auth.uid;
-        
-        // Allow update for likes and comments by members
-        allow update: if isCircleMember(circleId) &&
-          // Only allow updating likes and comments arrays
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likedBy', 'comments']);
-        
-        // Allow delete by creator or admin
-        allow delete: if isOwner(resource.data.userId) || isCircleAdmin(circleId);
-      }
-      
-      // Boards subcollection (Vibe Boards)
-      match /boards/{boardId} {
-        // Allow read if member
-        allow read: if isCircleMember(circleId);
-        
-        // Allow create if member
-        allow create: if isCircleMember(circleId) && 
-          request.resource.data.creatorId == request.auth.uid;
-        
-        // Allow update by creator or for likes/saves
-        allow update: if isOwner(resource.data.creatorId) ||
-          (isCircleMember(circleId) && 
-           request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['likeCount', 'saveCount', 'likedBy', 'savedBy']));
-        
-        // Allow delete by creator or admin
-        allow delete: if isOwner(resource.data.creatorId) || isCircleAdmin(circleId);
-      }
-      
-      // Micro Reviews subcollection
-      match /microReviews/{reviewId} {
-        // Allow read if member
-        allow read: if isCircleMember(circleId);
-        
-        // Allow create if member
-        allow create: if isCircleMember(circleId) && 
-          request.resource.data.userId == request.auth.uid &&
-          request.resource.data.quickTake.size() <= 280; // Enforce character limit
-        
-        // Allow update by creator or for likes
-        allow update: if isOwner(resource.data.userId) ||
-          (isCircleMember(circleId) && 
-           request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['likeCount', 'likedBy']));
-        
-        // Allow delete by creator or admin
-        allow delete: if isOwner(resource.data.userId) || isCircleAdmin(circleId);
-      }
-      
-      // Join Requests subcollection
-      match /joinRequests/{requestId} {
-        // Allow read by admins and the requester
-        allow read: if isCircleAdmin(circleId) || requestId == request.auth.uid;
-        
-        // Allow create by the requester
-        allow create: if isAuthenticated() && 
-          requestId == request.auth.uid &&
-          request.resource.data.userId == request.auth.uid;
-        
-        // Allow update only by admin (to approve/reject)
-        allow update: if isCircleAdmin(circleId);
-        
-        // Allow delete by admin or requester
-        allow delete: if isCircleAdmin(circleId) || requestId == request.auth.uid;
-      }
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+                   request.auth.uid == request.resource.data.createdBy;
+      allow update: if request.auth != null && 
+                   (request.auth.uid == resource.data.createdBy ||
+                    request.auth.uid in resource.data.memberIds);
+      allow delete: if request.auth != null && request.auth.uid == resource.data.createdBy;
     }
-    
-    // Notifications collection
-    match /notifications/{userId} {
-      allow read: if isOwner(userId);
-      allow create: if false; // Only cloud functions should create
-      allow update: if isOwner(userId) && 
-        // Only allow marking as read
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
-      allow delete: if isOwner(userId);
+
+    // Circle members subcollection
+    match /circles/{circleId}/members/{memberId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Places collection
+    match /places/{placeId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // Allow temporary access for development
+    match /{document=**} {
+      allow read, write: if request.time < timestamp.date(2025, 12, 31);
+    }
+    // Enhanced visits collection with new fields
+    match /visits/{visitId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && 
+                   request.auth.uid == request.resource.data.userId &&
+                   validateVisitData(request.resource.data);
+      allow update: if request.auth != null && 
+                   request.auth.uid == resource.data.userId &&
+                   validateVisitUpdate(request.resource.data);
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // User vibe scores collection
+    match /user_vibe_scores/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Public check-in stories (for discovery)
+    match /public_stories/{storyId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+                   request.auth.uid == request.resource.data.userId &&
+                   request.resource.data.isStoryPublic == true;
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    function validateVisitData(data) {
+      return data.keys().hasAll(['userId', 'placeId', 'placeName', 'placeType', 'latitude', 'longitude', 'visitTime', 'isManualCheckIn']) &&
+             data.userId is string &&
+             data.placeId is string &&
+             data.placeName is string &&
+             data.placeType is string &&
+             data.latitude is number &&
+             data.longitude is number &&
+             data.visitTime is timestamp &&
+             data.isManualCheckIn is bool &&
+             (data.vibes is list || !data.keys().hasAny(['vibes'])) &&
+             (data.rating == null || (data.rating is number && data.rating >= 1 && data.rating <= 5)) &&
+             (data.vibeCred == null || (data.vibeCred is number && data.vibeCred >= 0)) &&
+             (data.photoCredibilityScore == null || (data.photoCredibilityScore is number && data.photoCredibilityScore >= 0 && data.photoCredibilityScore <= 1));
+    }
+
+    function validateVisitUpdate(data) {
+      return validateVisitData(data) &&
+             data.userId == resource.data.userId &&
+             data.placeId == resource.data.placeId;
+    }
+
+    // Enhanced user profile validation
+    function validateEnhancedUserData(data) {
+      return data.keys().hasAll(['id', 'name', 'email', 'createdAt', 'lastLogin', 
+                                'vibeProfile', 'tasteSignature', 'behavioralSignals',
+                                'onboardingData', 'privacySettings', 'notificationPreferences',
+                                'profileLastUpdated', 'appVersion']) &&
+             data.id is string &&
+             data.name is string &&
+             data.email is string &&
+             data.createdAt is timestamp &&
+             data.lastLogin is timestamp &&
+             validateVibeProfile(data.vibeProfile) &&
+             validatePrivacySettings(data.privacySettings) &&
+             data.profileLastUpdated is timestamp &&
+             data.appVersion is string;
+    }
+
+    function validateVibeProfile(vibeProfile) {
+      return vibeProfile.keys().hasAll(['primaryVibes', 'vibeScores', 'vibeEvolution', 
+                                       'contextualVibes', 'lastUpdated']) &&
+             vibeProfile.primaryVibes is list &&
+             vibeProfile.primaryVibes.size() <= 8 &&
+             vibeProfile.vibeScores is map &&
+             vibeProfile.vibeEvolution is list &&
+             vibeProfile.contextualVibes is map &&
+             vibeProfile.lastUpdated is timestamp;
+    }
+
+    function validatePrivacySettings(privacySettings) {
+      return privacySettings.keys().hasAll(['vibeVisibility', 'locationSharing', 
+                                           'activityPrivacyLevel', 'allowVibeMatching']) &&
+             privacySettings.vibeVisibility is bool &&
+             privacySettings.locationSharing is bool &&
+             privacySettings.activityPrivacyLevel in ['public', 'circles', 'private'] &&
+             privacySettings.allowVibeMatching is bool;
+    }
+
+    // Privacy-aware user profile reading
+    function canReadUserProfile(targetUserId, requestingUserId) {
+      // Get target user's privacy settings
+      let targetUser = get(/databases/$(database)/documents/users/$(targetUserId));
+      let privacySettings = targetUser.data.privacySettings;
       
-      // Circle notifications subcollection
-      match /circle_notifications/{notificationId} {
-        allow read: if isOwner(userId);
-        allow create: if false; // Only cloud functions should create
-        allow update: if isOwner(userId) && 
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
-        allow delete: if isOwner(userId);
+      // Public profiles can always be read
+      if (privacySettings.activityPrivacyLevel == 'public') {
+        return true;
       }
+      
+      // Private profiles cannot be read by others
+      if (privacySettings.activityPrivacyLevel == 'private') {
+        return false;
+      }
+      
+      // Circle-level privacy: check if users share circles
+      if (privacySettings.activityPrivacyLevel == 'circles') {
+        return shareCircles(targetUserId, requestingUserId);
+      }
+      
+      return false;
     }
-    
-    // Search history (if you want to store it in Firestore instead of local storage)
-    match /searchHistory/{historyId} {
-      allow read: if isOwner(resource.data.userId);
-      allow create: if isAuthenticated() && 
-        request.resource.data.userId == request.auth.uid;
-      allow update: if false; // Search history shouldn't be updated
-      allow delete: if isOwner(resource.data.userId);
+
+    function shareCircles(user1Id, user2Id) {
+      // Check if users are in any common circles
+      let user1Memberships = get(/databases/$(database)/documents/circle_memberships/$(user1Id)).data;
+      let user2Memberships = get(/databases/$(database)/documents/circle_memberships/$(user2Id)).data;
+      
+      // This is a simplified check - in practice you'd query the memberships collection
+      return true; // Placeholder - implement based on your membership structure
     }
-    
-    // Global stats or featured circles (admin only)
-    match /featured/{documentId} {
-      allow read: if true; // Public read
-      allow write: if false; // Admin SDK only
+
+    // Vibe matching cache collection
+    match /vibe_match_cache/{cacheId} {
+      allow read, write: if request.auth != null && 
+                        cacheId.split('_')[0] == request.auth.uid;
     }
-    
-    // Reports collection (for reporting inappropriate content)
-    match /reports/{reportId} {
-      allow read: if false; // Admin only
-      allow create: if isAuthenticated() && 
-        request.resource.data.reporterId == request.auth.uid;
-      allow update: if false; // Admin only
-      allow delete: if false; // Never delete reports
+
+    // Boards collection with enhanced privacy
+    match /boards/{boardId} {
+      allow read: if request.auth != null && 
+                 (resource.data.isPublic == true || 
+                  request.auth.uid == resource.data.createdBy ||
+                  canAccessPrivateBoard(boardId, request.auth.uid));
+      allow create: if request.auth != null && 
+                   request.auth.uid == request.resource.data.createdBy;
+      allow update: if request.auth != null && 
+                   request.auth.uid == resource.data.createdBy;
+      allow delete: if request.auth != null && 
+                   request.auth.uid == resource.data.createdBy;
+    }
+
+    function canAccessPrivateBoard(boardId, userId) {
+      // Check if user has been granted access to private board
+      // This could be through circle membership or direct sharing
+      return false; // Implement based on your sharing logic
+    }
+
+    // Circle memberships collection
+    match /circle_memberships/{membershipId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+                   request.auth.uid == request.resource.data.userId;
+      allow update: if request.auth != null && 
+                   (request.auth.uid == resource.data.userId ||
+                    isCircleAdmin(resource.data.circleId, request.auth.uid));
+      allow delete: if request.auth != null && 
+                   (request.auth.uid == resource.data.userId ||
+                    isCircleAdmin(resource.data.circleId, request.auth.uid));
+    }
+
+    function isCircleAdmin(circleId, userId) {
+      let circle = get(/databases/$(database)/documents/circles/$(circleId));
+      return circle.data.createdBy == userId;
     }
   }
 }

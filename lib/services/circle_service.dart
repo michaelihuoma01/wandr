@@ -765,6 +765,197 @@ class CircleService {
     }
     return batches;
   }
+
+  // Reactions Management
+  Future<bool> toggleReaction({
+    required String circleId,
+    required String activityId,
+    required String emoji,
+  }) async {
+    if (_userId == null) return false;
+
+    try {
+      final activityRef = firestore
+          .collection('circles')
+          .doc(circleId)
+          .collection('activity')
+          .doc(activityId);
+
+      final doc = await activityRef.get();
+      if (!doc.exists) return false;
+
+      final data = doc.data()!;
+      final reactions = Map<String, List<dynamic>>.from(data['reactions'] ?? {});
+      
+      // Check if user already reacted
+      String? existingReaction;
+      for (final entry in reactions.entries) {
+        if (entry.value.contains(_userId)) {
+          existingReaction = entry.key;
+          break;
+        }
+      }
+
+      // Remove existing reaction if any
+      if (existingReaction != null) {
+        reactions[existingReaction]!.remove(_userId);
+        if (reactions[existingReaction]!.isEmpty) {
+          reactions.remove(existingReaction);
+        }
+      }
+
+      // Add new reaction if different from existing
+      if (existingReaction != emoji) {
+        if (!reactions.containsKey(emoji)) {
+          reactions[emoji] = [];
+        }
+        reactions[emoji]!.add(_userId);
+      }
+
+      await activityRef.update({'reactions': reactions});
+      return true;
+    } catch (e) {
+      print('Error toggling reaction: $e');
+      return false;
+    }
+  }
+
+  // Comments Management
+  Future<bool> addComment({
+    required String circleId,
+    required String activityId,
+    required String text,
+  }) async {
+    if (_userId == null) return false;
+
+    try {
+      final userName = await _authService.getDisplayName();
+      final comment = ActivityComment(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: _userId!,
+        userName: userName,
+        userPhotoUrl: _auth.currentUser?.photoURL,
+        text: text,
+        timestamp: DateTime.now(),
+      );
+
+      await firestore
+          .collection('circles')
+          .doc(circleId)
+          .collection('activity')
+          .doc(activityId)
+          .update({
+        'comments': FieldValue.arrayUnion([comment.toJson()]),
+      });
+
+      // Send notification to activity creator if not self
+      final activityDoc = await firestore
+          .collection('circles')
+          .doc(circleId)
+          .collection('activity')
+          .doc(activityId)
+          .get();
+      
+      if (activityDoc.exists && activityDoc.data()!['userId'] != _userId) {
+        await _sendCommentNotification(
+          circleId: circleId,
+          activityId: activityId,
+          activityUserId: activityDoc.data()!['userId'],
+          commenterName: userName,
+        );
+      }
+
+      return true;
+    } catch (e) {
+      print('Error adding comment: $e');
+      return false;
+    }
+  }
+
+  // Legacy like functionality (can coexist with reactions)
+  Future<bool> toggleLike({
+    required String circleId,
+    required String activityId,
+  }) async {
+    if (_userId == null) return false;
+
+    try {
+      final activityRef = firestore
+          .collection('circles')
+          .doc(circleId)
+          .collection('activity')
+          .doc(activityId);
+
+      final doc = await activityRef.get();
+      if (!doc.exists) return false;
+
+      final likedBy = List<String>.from(doc.data()!['likedBy'] ?? []);
+      
+      if (likedBy.contains(_userId)) {
+        likedBy.remove(_userId);
+      } else {
+        likedBy.add(_userId!);
+      }
+
+      await activityRef.update({'likedBy': likedBy});
+      return true;
+    } catch (e) {
+      print('Error toggling like: $e');
+      return false;
+    }
+  }
+
+  // Push Notification Setup
+  Future<void> updateFCMToken(String token) async {
+    if (_userId == null) return;
+
+    try {
+      await firestore.collection('users').doc(_userId).update({
+        'fcmTokens': FieldValue.arrayUnion([token]),
+        'lastTokenUpdate': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error updating FCM token: $e');
+    }
+  }
+
+  Future<void> removeFCMToken(String token) async {
+    if (_userId == null) return;
+
+    try {
+      await firestore.collection('users').doc(_userId).update({
+        'fcmTokens': FieldValue.arrayRemove([token]),
+      });
+    } catch (e) {
+      print('Error removing FCM token: $e');
+    }
+  }
+
+  // Private notification helper
+  Future<void> _sendCommentNotification({
+    required String circleId,
+    required String activityId,
+    required String activityUserId,
+    required String commenterName,
+  }) async {
+    try {
+      await firestore
+          .collection('notifications')
+          .doc(activityUserId)
+          .collection('circle_notifications')
+          .add({
+        'type': 'comment',
+        'circleId': circleId,
+        'activityId': activityId,
+        'title': 'New Comment',
+        'body': '$commenterName commented on your post',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error sending comment notification: $e');
+    }
+  }
 }
 
 // Result class

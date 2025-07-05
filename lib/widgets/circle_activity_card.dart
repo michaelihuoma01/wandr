@@ -2,23 +2,81 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+import 'package:myapp/services/auth_service.dart';
+import 'package:myapp/services/circle_service.dart';
 import 'package:myapp/widgets/activity_comments.dart';
 import 'package:myapp/widgets/emoji_reactions.dart';
 import '../models/circle_models.dart';
 import '../models/visit_models.dart';
 
-class CircleActivityCard extends StatelessWidget {
+class CircleActivityCard extends StatefulWidget {
   final CircleActivity activity;
-  final VoidCallback? onLike;
-  final VoidCallback? onComment;
+   final VoidCallback? onActivityUpdate;
 
   const CircleActivityCard({
     super.key,
     required this.activity,
-    this.onLike,
-    this.onComment,
+    this.onActivityUpdate,
   });
 
+  @override
+  State<CircleActivityCard> createState() => _CircleActivityCardState();
+}
+
+class _CircleActivityCardState extends State<CircleActivityCard> {
+   final CircleService _circleService = CircleService();
+  final AuthService _authService = AuthService();
+  
+  bool _isLiking = false;
+  bool _isReacting = false;
+
+  Future<void> _handleLike() async {
+    if (_isLiking) return;
+    
+    setState(() => _isLiking = true);
+    
+    final success = await _circleService.toggleLike(
+      circleId: widget.activity.circleId,
+      activityId: widget.activity.id,
+    );
+    
+    if (success && widget.onActivityUpdate != null) {
+      widget.onActivityUpdate!();
+    }
+    
+    setState(() => _isLiking = false);
+  }
+
+  Future<void> _handleReaction(String emoji) async {
+    if (_isReacting) return;
+    
+    setState(() => _isReacting = true);
+    
+    final success = await _circleService.toggleReaction(
+      circleId: widget.activity.circleId,
+      activityId: widget.activity.id,
+      emoji: emoji,
+    );
+    
+    if (success && widget.onActivityUpdate != null) {
+      widget.onActivityUpdate!();
+    }
+    
+    setState(() => _isReacting = false);
+  }
+
+  Future<void> _handleComment(String text) async {
+    final success = await _circleService.addComment(
+      circleId: widget.activity.circleId,
+      activityId: widget.activity.id,
+      text: text,
+    );
+    
+    if (success && widget.onActivityUpdate != null) {
+      widget.onActivityUpdate!();
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -52,13 +110,13 @@ class CircleActivityCard extends StatelessWidget {
           // User avatar
           CircleAvatar(
             radius: 20,
-            backgroundImage: activity.userPhotoUrl != null
-                ? CachedNetworkImageProvider(activity.userPhotoUrl!)
+            backgroundImage: widget.activity.userPhotoUrl != null
+                ? CachedNetworkImageProvider(widget.activity.userPhotoUrl!)
                 : null,
-            child: activity.userPhotoUrl == null
+            child: widget.activity.userPhotoUrl == null
                 ? Text(
-                    activity.userName.isNotEmpty
-                        ? activity.userName[0].toUpperCase()
+                    widget.activity.userName.isNotEmpty
+                        ? widget.activity.userName[0].toUpperCase()
                         : '?',
                     style: const TextStyle(fontSize: 18),
                   )
@@ -74,7 +132,7 @@ class CircleActivityCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      activity.userName,
+                      widget.activity.userName,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -82,7 +140,7 @@ class CircleActivityCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Icon(
-                      activity.icon,
+                      widget.activity.icon,
                       size: 16,
                       color: Theme.of(context).primaryColor,
                     ),
@@ -90,7 +148,7 @@ class CircleActivityCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _formatTime(activity.timestamp),
+                  _formatTime(widget.activity.timestamp),
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.grey[600],
@@ -114,7 +172,7 @@ class CircleActivityCard extends StatelessWidget {
   }
 
   Widget _buildContent(BuildContext context) {
-    switch (activity.type) {
+    switch (widget.activity.type) {
       case ActivityType.checkIn:
         return _buildCheckInContent(context);
       case ActivityType.placeShared:
@@ -131,12 +189,12 @@ class CircleActivityCard extends StatelessWidget {
   }
 
   Widget _buildCheckInContent(BuildContext context) {
-    final placeName = activity.data['placeName'] ?? 'Unknown Place';
-    final placeType = activity.data['placeType'] ?? '';
-    final vibes = List<String>.from(activity.data['vibes'] ?? []);
-    final note = activity.data['note'];
-    final rating = activity.data['rating'] as int?;
-    final photoUrls = List<String>.from(activity.data['photoUrls'] ?? []);
+    final placeName = widget.activity.data['placeName'] ?? 'Unknown Place';
+    final placeType = widget.activity.data['placeType'] ?? '';
+    final vibes = List<String>.from(widget.activity.data['vibes'] ?? []);
+    final note = widget.activity.data['note'];
+    final rating = widget.activity.data['rating'] as int?;
+    final photoUrls = List<String>.from(widget.activity.data['photoUrls'] ?? []);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,9 +326,9 @@ class CircleActivityCard extends StatelessWidget {
   }
 
   Widget _buildPlaceSharedContent(BuildContext context) {
-    final placeName = activity.data['placeName'] ?? 'Unknown Place';
-    final note = activity.data['note'] ?? '';
-    final imageUrl = activity.data['imageUrl'];
+    final placeName = widget.activity.data['placeName'] ?? 'Unknown Place';
+    final note = widget.activity.data['note'] ?? '';
+    final imageUrl = widget.activity.data['imageUrl'];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -333,9 +391,9 @@ class CircleActivityCard extends StatelessWidget {
   }
 
   Widget _buildBoardCreatedContent(BuildContext context) {
-    final boardTitle = activity.data['boardTitle'] ?? 'Untitled Board';
-    final placeCount = activity.data['placeCount'] ?? 0;
-    final coverImageUrl = activity.data['coverImageUrl'];
+    final boardTitle = widget.activity.data['boardTitle'] ?? 'Untitled Board';
+    final placeCount = widget.activity.data['placeCount'] ?? 0;
+    final coverImageUrl = widget.activity.data['coverImageUrl'];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -388,9 +446,9 @@ class CircleActivityCard extends StatelessWidget {
   }
 
   Widget _buildMicroReviewContent(BuildContext context) {
-    final placeName = activity.data['placeName'] ?? 'Unknown Place';
-    final quickTake = activity.data['quickTake'] ?? '';
-    final rating = activity.data['rating'] as int?;
+    final placeName = widget.activity.data['placeName'] ?? 'Unknown Place';
+    final quickTake = widget.activity.data['quickTake'] ?? '';
+    final rating = widget.activity.data['rating'] as int?;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -468,7 +526,7 @@ class CircleActivityCard extends StatelessWidget {
   }
 
   Widget _buildMilestoneContent(BuildContext context) {
-    final message = activity.data['message'] ?? 'Circle milestone!';
+    final message = widget.activity.data['message'] ?? 'Circle milestone!';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -482,109 +540,68 @@ class CircleActivityCard extends StatelessWidget {
     );
   }
 
-  Widget _buildFooter(BuildContext context) {
-    final isLiked =
-        activity.likedBy.contains('currentUserId'); // TODO: Get current user ID
+   Widget _buildFooter(BuildContext context) {
+    final currentUserId = _authService.currentUser?.uid;
+    final isLiked = widget.activity.likedBy.contains(currentUserId);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: Colors.grey[200]!),
-        ),
-      ),
-      child: Row(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Like button
-          InkWell(
-            onTap: onLike,
-            borderRadius: BorderRadius.circular(20),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  Icon(
-                    isLiked ? Icons.favorite : Icons.favorite_border,
-                    size: 20,
-                    color: isLiked ? Colors.red : Colors.grey[600],
-                  ),
-                  if (activity.likedBy.isNotEmpty) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      '${activity.likedBy.length}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
+          // Reactions and Like row
+          Row(
+            children: [
+              // Like button
+              InkWell(
+                onTap: _isLiking ? null : _handleLike,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isLiked ? Icons.favorite : Icons.favorite_border,
+                        size: 20,
+                        color: isLiked ? Colors.red : Colors.grey[600],
                       ),
-                    ),
-                  ],
-                ],
+                      if (widget.activity.likedBy.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '${widget.activity.likedBy.length}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
-            ),
+              
+              const SizedBox(width: 8),
+              
+              // Emoji reactions
+              Expanded(
+                child: EmojiReactionsWidget(
+                  activityId: widget.activity.id,
+                  circleId: widget.activity.circleId,
+                  reactions: widget.activity.reactions,
+                  onReact: _handleReaction,
+                ),
+              ),
+            ],
           ),
-
-          EmojiReactionsWidget(
-              activityId: activity.id,
-              circleId: activity.circleId,
-              reactions: {
-                'Love': ['❤️'],
-                'Haha': ['😂'],
-                'Sad': ['😢'],
-                'Lit': ['🔥'],
-                'Yay!': ['🎉'],
-                'Yum': ['😋'],
-                'Wow': ['🤩']
-              },
-              onReact: (val) => {
-                    print("Reaction: $val"),
-                  }), // TODO: Implement reactions
-
+          
+          const Divider(height: 24),
+          
+          // Comments section
           ActivityCommentsWidget(
-              activityId: activity.id,
-              circleId: activity.circleId,
-              comments: [],
-              onAddComment: (onAddComment) => {
-                    print("Comment: $onAddComment"),
-                  }), // TODO: Implement comments
-
-          const SizedBox(width: 16),
-
-          // Comment button
-          InkWell(
-            onTap: onComment,
-            borderRadius: BorderRadius.circular(20),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.chat_bubble_outline,
-                    size: 20,
-                    color: Colors.grey[600],
-                  ),
-                  if (activity.comments.isNotEmpty) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      '${activity.comments.length}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-
-          const Spacer(),
-
-          // Share button
-          IconButton(
-            icon: Icon(Icons.share_outlined, size: 20, color: Colors.grey[600]),
-            onPressed: () {
-              // TODO: Implement share
-            },
+            activityId: widget.activity.id,
+            circleId: widget.activity.circleId,
+            comments: widget.activity.comments,
+            onAddComment: _handleComment,
           ),
         ],
       ),

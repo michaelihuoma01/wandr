@@ -79,5 +79,10 @@
 	<!-- Google Maps API Key -->
 	<key>GMSApiKey</key>
 	<string>AIzaSyBm3Am2fZKUkTfgzdRRB6pgQACB9x4Ywqw</string>
+	<key>UIBackgroundModes</key>
+	<array>
+	<string>fetch</string>
+	<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

@@ -1,8 +1,33 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:myapp/screens/circles/circle_detail_screen.dart';
+import 'package:myapp/services/notification_service.dart';
 import 'screens/home_screen.dart';
+import 'screens/auth_wrapper.dart';
+import 'screens/enhanced_auth_screen.dart';
+import 'screens/onboarding/welcome_screen.dart';
+import 'screens/onboarding/vibe_wheel_screen.dart';
+import 'screens/onboarding/contextual_preferences_screen.dart';
+import 'screens/onboarding/social_matching_screen.dart';
+import 'screens/enhanced_profile_screen.dart';
+import 'screens/user_discovery_screen.dart';
 
 import 'package:firebase_core/firebase_core.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+Future<void> initializeBackgroundService() async {
+  // Configure background service for location tracking
+  // Implementation depends on chosen background service package
+}
+
+// Background message handler
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print('Handling a background message: ${message.messageId}');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,7 +39,23 @@ void main() async {
           storageBucket: "locale-lens-uslei.firebasestorage.app",
           projectId: "locale-lens-uslei"));
 
- // Set system UI overlay style
+  // Set up background message handler
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // Initialize notifications
+  final notificationService = NotificationService();
+  // await notificationService.initialize();
+
+  // Set up navigation callback
+  notificationService.navigateToCircle = (circleId) {
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (context) => CircleDetailScreen(circleId: circleId),
+      ),
+    );
+  };
+
+  // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -24,27 +65,55 @@ void main() async {
     ),
   );
 
-    // Initialize background service
+  // Initialize background service
   await initializeBackgroundService();
 
   runApp(const MyApp());
 }
 
-  Future<void> initializeBackgroundService() async {
-    // Configure background service for location tracking
-    // Implementation depends on chosen background service package
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final NotificationService _notificationService = NotificationService();
+
+  @override
+  void initState() {
+    super.initState();
+    _setupNotifications();
   }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  void _setupNotifications() {
+    // Set up navigation callback
+    _notificationService.navigateToCircle = (circleId) {
+      // Navigate to circle detail screen
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (context) => CircleDetailScreen(circleId: circleId),
+        ),
+      );
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Wandr - AI Place Discovery',
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       routes: {
-         '/home': (context) => const HomeScreen(),
+        '/auth': (context) => const EnhancedAuthScreen(),
+        '/home': (context) => const HomeScreen(),
+        '/onboarding': (context) => const OnboardingWelcomeScreen(),
+        '/onboarding/vibe-wheel': (context) => const VibeWheelScreen(),
+        '/onboarding/contextual-preferences': (context) => const ContextualPreferencesScreen(),
+        '/onboarding/social-matching': (context) => const SocialMatchingScreen(),
+        '/profile': (context) => const EnhancedProfileScreen(),
+        '/discover': (context) => const UserDiscoveryScreen(),
       },
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -54,7 +123,7 @@ class MyApp extends StatelessWidget {
         primaryColor: const Color(0xFF6200EE),
         useMaterial3: true,
         fontFamily: 'SF Pro Display', // Uses system font
-        
+
         // Custom text theme
         textTheme: const TextTheme(
           headlineLarge: TextStyle(
@@ -76,7 +145,7 @@ class MyApp extends StatelessWidget {
             height: 1.5,
           ),
         ),
-        
+
         // Button theme
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
@@ -87,7 +156,7 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        
+
         // Input decoration theme
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
@@ -108,7 +177,7 @@ class MyApp extends StatelessWidget {
             vertical: 16,
           ),
         ),
-        
+
         // App bar theme
         appBarTheme: const AppBarTheme(
           elevation: 0,
@@ -117,7 +186,7 @@ class MyApp extends StatelessWidget {
           systemOverlayStyle: SystemUiOverlayStyle.dark,
         ),
       ),
-      home: const HomeScreen(),
+      home: AuthWrapper(),
     );
   }
 }

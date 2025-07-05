@@ -239,6 +239,7 @@ class CircleActivity {
   final DateTime timestamp;
   final List<String> likedBy;
   final List<ActivityComment> comments;
+  final Map<String, List<String>> reactions;
 
   CircleActivity({
     required this.id,
@@ -251,6 +252,7 @@ class CircleActivity {
     required this.timestamp,
     this.likedBy = const [],
     this.comments = const [],
+    this.reactions = const {},
   });
 
   factory CircleActivity.fromJson(Map<String, dynamic> json) => _$CircleActivityFromJson(json);
@@ -302,14 +304,18 @@ enum ActivityType {
 
 @JsonSerializable()
 class ActivityComment {
+  final String id; 
   final String userId;
   final String userName;
+  final String? userPhotoUrl;
   final String text;
   final DateTime timestamp;
 
   ActivityComment({
+    required this.id,
     required this.userId,
     required this.userName,
+    this.userPhotoUrl,
     required this.text,
     required this.timestamp,
   });

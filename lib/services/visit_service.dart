@@ -9,6 +9,8 @@ import 'package:permission_handler/permission_handler.dart';
 import '../models/visit_models.dart';
 import 'location_service.dart';
 import 'search_service.dart';
+import 'photo_verification_service.dart';
+import 'notification_service.dart';
 
 class VisitService {
   static final VisitService _instance = VisitService._internal();
@@ -19,33 +21,169 @@ class VisitService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final LocationService _locationService = LocationService();
   final SearchService _searchService = SearchService();
+  final PhotoVerificationService _photoService = PhotoVerificationService();
+  final NotificationService _notificationService = NotificationService();
+
+  // Getter for photo service access
+  PhotoVerificationService get photoService => _photoService;
 
   StreamSubscription<Position>? _locationSubscription;
   Timer? _visitDetectionTimer;
   Position? _lastKnownPosition;
   DateTime? _lastVisitCheck;
   
-  // Visit detection parameters
-  static const double _visitDetectionRadiusMeters = 50.0; // 50m radius
+  // Enhanced visit detection parameters
+  static const double _visitDetectionRadiusMeters = 50.0; // 50m radius for auto-detection
+  static const double _checkInVerificationRadiusMeters = 500.0; // 500m radius for manual check-ins
   static const Duration _minimumStayDuration = Duration(minutes: 5);
   static const Duration _checkInterval = Duration(minutes: 2);
+  static const Duration _gracePeriodDuration = Duration(hours: 24); // 24-hour grace period
+  
+  // Notification tracking
+  final Map<String, DateTime> _lastNotificationSent = {};
+  final Set<String> _pendingCheckIns = {};
 
   // Get current user ID
   String? get _userId => _auth.currentUser?.uid;
 
-  // Manual check-in
+  // Verify check-in eligibility
+  Future<CheckInVerification> verifyCheckInEligibility({
+    required PlaceDetails place,
+    Position? currentPosition,
+  }) async {
+    if (_userId == null) {
+      return CheckInVerification(
+        isWithinRadius: false,
+        distanceFromPlace: double.infinity,
+        isWithinGracePeriod: false,
+        canCheckIn: false,
+        error: 'User not authenticated',
+      );
+    }
+
+    try {
+      // Get current position if not provided
+      if (currentPosition == null) {
+        final locationResult = await _locationService.getCurrentLocation();
+        if (!locationResult.success || locationResult.position == null) {
+          return CheckInVerification(
+            isWithinRadius: false,
+            distanceFromPlace: double.infinity,
+            isWithinGracePeriod: false,
+            canCheckIn: false,
+            error: locationResult.error ?? 'Unable to get current location',
+          );
+        }
+        currentPosition = locationResult.position;
+      }
+
+      // Calculate distance from place
+      final distance = Geolocator.distanceBetween(
+        currentPosition!.latitude,
+        currentPosition.longitude,
+        place.latitude,
+        place.longitude,
+      );
+
+      // Check if within verification radius
+      final isWithinRadius = distance <= _checkInVerificationRadiusMeters;
+
+      // Check for existing check-in today
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      final existingCheckIn = await _firestore
+          .collection('visits')
+          .where('userId', isEqualTo: _userId)
+          .where('placeId', isEqualTo: place.placeId)
+          .where('visitTime', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+          .where('visitTime', isLessThan: Timestamp.fromDate(endOfDay))
+          .limit(1)
+          .get();
+
+      if (existingCheckIn.docs.isNotEmpty) {
+        final lastCheckIn = PlaceVisit.fromFirestore(existingCheckIn.docs.first);
+        return CheckInVerification(
+          isWithinRadius: isWithinRadius,
+          distanceFromPlace: distance,
+          isWithinGracePeriod: false,
+          canCheckIn: false,
+          error: 'Already checked in today',
+          lastCheckInToday: lastCheckIn.visitTime,
+        );
+      }
+
+      // Check if within grace period for delayed check-in
+      final isWithinGracePeriod = !isWithinRadius && 
+                                 distance <= _checkInVerificationRadiusMeters * 2; // Extended radius for grace period
+
+      final canCheckIn = isWithinRadius || isWithinGracePeriod;
+
+      return CheckInVerification(
+        isWithinRadius: isWithinRadius,
+        distanceFromPlace: distance,
+        isWithinGracePeriod: isWithinGracePeriod,
+        canCheckIn: canCheckIn,
+        error: canCheckIn ? null : 'Too far from location to check in',
+      );
+    } catch (e) {
+      return CheckInVerification(
+        isWithinRadius: false,
+        distanceFromPlace: double.infinity,
+        isWithinGracePeriod: false,
+        canCheckIn: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  // Enhanced manual check-in with photo verification
   Future<CheckInResult> checkIn({
     required PlaceDetails place,
     required List<String> selectedVibes,
     String? userNote,
     int? rating,
+    File? photoFile,
+    String? storyCaption,
+    bool isStoryPublic = false,
+    DateTime? actualVisitTime, // For delayed check-ins
   }) async {
     if (_userId == null) {
       return CheckInResult(success: false, error: 'User not authenticated');
     }
 
     try {
-      // Create visit record
+      // Step 1: Verify check-in eligibility
+      final verification = await verifyCheckInEligibility(place: place);
+      if (!verification.canCheckIn) {
+        return CheckInResult(success: false, error: verification.error);
+      }
+
+      // Step 2: Handle photo verification if provided
+      PhotoVerificationResult? photoResult;
+      if (photoFile != null) {
+        photoResult = await _photoService.verifyPhoto(
+          photoFile: photoFile,
+          place: place,
+          captureTime: actualVisitTime,
+        );
+      }
+
+      // Step 3: Calculate credibility points
+      int credibilityPoints = _calculateCredibilityPoints(
+        verification: verification,
+        photoResult: photoResult,
+        hasNote: userNote?.isNotEmpty ?? false,
+        hasRating: rating != null,
+      );
+
+      // Step 4: Determine if this is a delayed check-in
+      final now = DateTime.now();
+      final hasDelayedCheckIn = actualVisitTime != null && 
+                              now.difference(actualVisitTime).inHours > 1;
+
+      // Step 5: Create enhanced visit record
       final visitRef = _firestore.collection('visits').doc();
       final visit = PlaceVisit(
         id: visitRef.id,
@@ -56,7 +194,7 @@ class VisitService {
         placeCategory: _categorizePlace(place.type, place.tags),
         latitude: place.latitude,
         longitude: place.longitude,
-        visitTime: DateTime.now(),
+        visitTime: actualVisitTime ?? now,
         isManualCheckIn: true,
         vibes: selectedVibes,
         userNote: userNote,
@@ -69,15 +207,38 @@ class VisitService {
           'phoneNumber': place.phoneNumber,
           'imageUrls': place.imageUrls,
         },
+        // Enhanced verification fields
+        isVerified: verification.isWithinRadius,
+        verificationDistance: verification.distanceFromPlace,
+        actualVisitTime: actualVisitTime,
+        hasDelayedCheckIn: hasDelayedCheckIn,
+        // Photo verification fields
+        hasVerifiedPhoto: photoResult?.isValid ?? false,
+        photoCredibilityScore: photoResult?.credibilityScore,
+        photoAnalysis: photoResult?.analysis,
+        instantVibeTags: photoResult?.suggestedTags,
+        // Check-in story
+        storyCaption: storyCaption,
+        isStoryPublic: isStoryPublic,
+        // Trust score impact
+        vibeCred: credibilityPoints,
       );
 
-      // Save to Firestore
+      // Step 6: Save to Firestore
       await visitRef.set(visit.toFirestore());
 
-      // Generate AI vibe if needed
+      // Step 7: Update user's vibe score
+      await _updateUserVibeScore(credibilityPoints, photoResult?.isValid ?? false);
+
+      // Step 8: Generate AI vibe if needed
       _generateAIVibe(visitRef.id, place, selectedVibes);
 
-      return CheckInResult(success: true, visitId: visitRef.id);
+      return CheckInResult(
+        success: true, 
+        visitId: visitRef.id,
+        credibilityPoints: credibilityPoints,
+        photoVerification: photoResult,
+      );
     } catch (e) {
       return CheckInResult(success: false, error: e.toString());
     }
@@ -108,6 +269,9 @@ class VisitService {
     ).listen((Position position) {
       _lastKnownPosition = position;
       _checkForVisits(position);
+      
+      // Send context-aware notifications
+      sendContextualNotifications(position);
     });
 
     // Start periodic visit detection
@@ -396,6 +560,209 @@ class VisitService {
     return null; // Placeholder
   }
 
+  // Calculate credibility points for a check-in
+  int _calculateCredibilityPoints({
+    required CheckInVerification verification,
+    PhotoVerificationResult? photoResult,
+    required bool hasNote,
+    required bool hasRating,
+  }) {
+    int points = 0;
+
+    // Base points for check-in
+    points += 5;
+
+    // Distance-based verification bonus
+    if (verification.isWithinRadius) {
+      points += 10; // Within 500m
+      if (verification.distanceFromPlace <= 100) {
+        points += 5; // Extra bonus for being very close
+      }
+    } else if (verification.isWithinGracePeriod) {
+      points += 3; // Partial credit for grace period
+    }
+
+    // Photo bonus
+    if (photoResult != null) {
+      points += _photoService.calculateCredibilityPoints(photoResult);
+    }
+
+    // Content bonus
+    if (hasNote) points += 2;
+    if (hasRating) points += 2;
+
+    return points;
+  }
+
+  // Update user's overall vibe score
+  Future<void> _updateUserVibeScore(int credibilityPoints, bool hasVerifiedPhoto) async {
+    if (_userId == null) return;
+
+    try {
+      final userScoreRef = _firestore.collection('user_vibe_scores').doc(_userId);
+      
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(userScoreRef);
+        
+        UserVibeScore currentScore;
+        if (snapshot.exists) {
+          currentScore = UserVibeScore.fromFirestore(snapshot);
+        } else {
+          // Create new user score
+          currentScore = UserVibeScore(
+            userId: _userId!,
+            totalCredPoints: 0,
+            verifiedCheckIns: 0,
+            photoUploads: 0,
+            communityLikes: 0,
+            badges: ['newcomer'],
+            lastUpdated: DateTime.now(),
+            level: 1,
+            title: 'Vibe Newcomer',
+          );
+        }
+
+        // Update stats
+        final newTotalPoints = currentScore.totalCredPoints + credibilityPoints;
+        final newVerifiedCheckIns = currentScore.verifiedCheckIns + 1;
+        final newPhotoUploads = hasVerifiedPhoto ? currentScore.photoUploads + 1 : currentScore.photoUploads;
+        
+        // Calculate new level (every 100 points = 1 level, max 10)
+        final newLevel = ((newTotalPoints / 100).floor() + 1).clamp(1, 10);
+        
+        // Determine new title and badges
+        final newTitle = _getTitleForLevel(newLevel);
+        final newBadges = _updateBadges(currentScore.badges, newTotalPoints, newVerifiedCheckIns, newPhotoUploads);
+
+        final updatedScore = UserVibeScore(
+          userId: _userId!,
+          totalCredPoints: newTotalPoints,
+          verifiedCheckIns: newVerifiedCheckIns,
+          photoUploads: newPhotoUploads,
+          communityLikes: currentScore.communityLikes,
+          badges: newBadges,
+          lastUpdated: DateTime.now(),
+          level: newLevel,
+          title: newTitle,
+        );
+
+        transaction.set(userScoreRef, updatedScore.toFirestore());
+      });
+    } catch (e) {
+      print('Error updating user vibe score: $e');
+    }
+  }
+
+  String _getTitleForLevel(int level) {
+    switch (level) {
+      case 1: return 'Vibe Newcomer';
+      case 2: return 'Vibe Explorer';
+      case 3: return 'Place Discoverer';
+      case 4: return 'Vibe Curator';
+      case 5: return 'Local Guide';
+      case 6: return 'Vibe Expert';
+      case 7: return 'Place Connoisseur';
+      case 8: return 'Local Tastemaker';
+      case 9: return 'Vibe Legend';
+      case 10: return 'Vibe Master';
+      default: return 'Vibe Newcomer';
+    }
+  }
+
+  List<String> _updateBadges(List<String> currentBadges, int totalPoints, int verifiedCheckIns, int photoUploads) {
+    final badges = Set<String>.from(currentBadges);
+    
+    // Check for new badges
+    for (final badge in VibeBadges.allBadges) {
+      if (badges.contains(badge.id)) continue;
+      
+      bool eligible = totalPoints >= badge.requiredPoints;
+      
+      // Check specific requirements
+      for (final requirement in badge.requirements.entries) {
+        switch (requirement.key) {
+          case 'verified_checkins':
+            eligible = eligible && verifiedCheckIns >= requirement.value;
+            break;
+          case 'verified_photos':
+            eligible = eligible && photoUploads >= requirement.value;
+            break;
+          case 'unique_places':
+            // Would need to calculate this from visits
+            break;
+        }
+      }
+      
+      if (eligible) {
+        badges.add(badge.id);
+      }
+    }
+    
+    return badges.toList();
+  }
+
+  // Context-aware notifications for nearby places
+  Future<void> sendContextualNotifications(Position position) async {
+    if (_userId == null) return;
+
+    try {
+      // Search for nearby places
+      final result = await _searchService.searchPlaces(
+        query: 'venues near me',
+        latitude: position.latitude,
+        longitude: position.longitude,
+        radiusKm: 0.5, // 500m radius
+      );
+
+      if (!result.success || result.locations.isEmpty) return;
+
+      final nearbyPlaces = result.locations.where((place) {
+        final distance = Geolocator.distanceBetween(
+          position.latitude,
+          position.longitude,
+          place.latitude,
+          place.longitude,
+        );
+        return distance <= 500; // Within 500m
+      }).toList();
+
+      if (nearbyPlaces.isEmpty) return;
+
+      // Check if we've sent notifications recently
+      final now = DateTime.now();
+      final locationKey = '${position.latitude.toStringAsFixed(3)}_${position.longitude.toStringAsFixed(3)}';
+      
+      if (_lastNotificationSent.containsKey(locationKey)) {
+        final lastSent = _lastNotificationSent[locationKey]!;
+        if (now.difference(lastSent).inMinutes < 30) {
+          return; // Don't spam notifications
+        }
+      }
+
+      // Send appropriate notification
+      if (nearbyPlaces.length == 1) {
+        // Single venue notification
+        final place = nearbyPlaces.first;
+        await _notificationService.sendLocalNotification(
+          title: 'Still at ${place.name}?',
+          body: 'Tap to check in and share your vibe!',
+          payload: 'checkin:${place.placeId}',
+        );
+      } else {
+        // Multiple venues notification
+        await _notificationService.sendLocalNotification(
+          title: 'Multiple spots nearby!',
+          body: 'You\'re near ${nearbyPlaces.length} places. Log a vibe now!',
+          payload: 'nearby:${nearbyPlaces.length}',
+        );
+      }
+
+      _lastNotificationSent[locationKey] = now;
+    } catch (e) {
+      print('Error sending contextual notification: $e');
+    }
+  }
+
   // Generate AI vibe (placeholder - implement with your AI service)
   Future<void> _generateAIVibe(String visitId, PlaceDetails place, List<String> userVibes) async {
     // TODO: Implement AI vibe generation
@@ -409,8 +776,16 @@ class CheckInResult {
   final bool success;
   final String? visitId;
   final String? error;
+  final int? credibilityPoints;
+  final PhotoVerificationResult? photoVerification;
 
-  CheckInResult({required this.success, this.visitId, this.error});
+  CheckInResult({
+    required this.success, 
+    this.visitId, 
+    this.error,
+    this.credibilityPoints,
+    this.photoVerification,
+  });
 }
 
 class VisitStats {

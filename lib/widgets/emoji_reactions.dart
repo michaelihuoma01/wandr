@@ -25,8 +25,15 @@ class _EmojiReactionsWidgetState extends State<EmojiReactionsWidget> {
   final AuthService _authService = AuthService();
   bool _showReactionPicker = false;
   
-  static const List<String> availableEmojis = [
-    '❤️', '👍', '😊', '😍', '🔥', '🎉', '😋', '🤩'
+  static const List<Map<String, String>> availableReactions = [
+    {'emoji': '❤️', 'name': 'Love'},
+    {'emoji': '👍', 'name': 'Like'},
+    {'emoji': '😂', 'name': 'Haha'},
+    {'emoji': '😮', 'name': 'Wow'},
+    {'emoji': '😢', 'name': 'Sad'},
+    {'emoji': '🔥', 'name': 'Fire'},
+    {'emoji': '🎉', 'name': 'Celebrate'},
+    {'emoji': '😋', 'name': 'Yum'},
   ];
 
   String? _getUserReaction() {
@@ -46,146 +53,115 @@ class _EmojiReactionsWidgetState extends State<EmojiReactionsWidget> {
     widget.onReact(emoji);
   }
 
+  int get _totalReactionCount {
+    return widget.reactions.values.fold(0, (sum, list) => sum + list.length);
+  }
+
   @override
   Widget build(BuildContext context) {
     final userReaction = _getUserReaction();
     final hasReacted = userReaction != null;
     
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Reaction summary bar
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            // Show existing reactions
-            ...widget.reactions.entries
+        // Reaction summary
+        if (_totalReactionCount > 0) ...[
+          Wrap(
+            spacing: 4,
+            children: widget.reactions.entries
                 .where((entry) => entry.value.isNotEmpty)
-                .map((entry) => _buildReactionChip(
-                      emoji: entry.key,
-                      count: entry.value.length,
-                      isUserReaction: entry.key == userReaction,
-                      context: context,
-                    )),
-            
-            // Add reaction button
-            InkWell(
-              onTap: () {
-                setState(() => _showReactionPicker = !_showReactionPicker);
-              },
-              borderRadius: BorderRadius.circular(20),
+                .take(3)
+                .map((entry) => Text(
+                      entry.key,
+                      style: const TextStyle(fontSize: 16),
+                    ))
+                .toList(),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '$_totalReactionCount',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(width: 12),
+        ],
+        
+        // Add reaction button
+        InkWell(
+          onTap: () {
+            setState(() => _showReactionPicker = !_showReactionPicker);
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Icon(
+              hasReacted ? Icons.emoji_emotions : Icons.add_reaction_outlined,
+              size: 20,
+              color: hasReacted ? Theme.of(context).primaryColor : Colors.grey[600],
+            ),
+          ),
+        ),
+        
+        // Reaction picker popup
+        if (_showReactionPicker)
+          Positioned(
+            bottom: 30,
+            left: 0,
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(12),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(20),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      hasReacted ? Icons.emoji_emotions : Icons.add_reaction_outlined,
-                      size: 20,
-                      color: hasReacted ? Theme.of(context).primaryColor : Colors.grey[600],
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      hasReacted ? 'Change' : 'React',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: hasReacted ? Theme.of(context).primaryColor : Colors.grey[600],
-                        fontWeight: FontWeight.w500,
+                  children: availableReactions.map((reaction) {
+                    final isSelected = userReaction == reaction['emoji'];
+                    return InkWell(
+                      onTap: () => _handleReaction(reaction['emoji']!),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isSelected 
+                              ? Theme.of(context).primaryColor.withOpacity(0.1)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              reaction['emoji']!,
+                              style: const TextStyle(fontSize: 20),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              reaction['name']!,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isSelected
+                                    ? Theme.of(context).primaryColor
+                                    : Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    );
+                  }).toList(),
                 ),
               ),
             ),
-          ],
-        ),
-        
-        // Reaction picker
-        if (_showReactionPicker) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: availableEmojis.map((emoji) {
-                return InkWell(
-                  onTap: () => _handleReaction(emoji),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    child: Text(
-                      emoji,
-                      style: const TextStyle(fontSize: 24),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
           ),
-        ],
       ],
-    );
-  }
-
-  Widget _buildReactionChip({
-    required String emoji,
-    required int count,
-    required bool isUserReaction,
-    required BuildContext context,
-  }) {
-    return InkWell(
-      onTap: () => _handleReaction(emoji),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isUserReaction 
-              ? Theme.of(context).primaryColor.withOpacity(0.1)
-              : Colors.grey[100],
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isUserReaction 
-                ? Theme.of(context).primaryColor.withOpacity(0.3)
-                : Colors.grey[300]!,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              emoji,
-              style: const TextStyle(fontSize: 18),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              count.toString(),
-              style: TextStyle(
-                fontSize: 13,
-                color: isUserReaction 
-                    ? Theme.of(context).primaryColor 
-                    : Colors.grey[700],
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -1,4 +1,6 @@
 // lib/screens/circles/circle_detail_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:myapp/screens/create_vibe_board_screen.dart';
@@ -43,18 +45,32 @@ class _CircleDetailScreenState extends State<CircleDetailScreen>
   List<CircleActivity> _activities = [];
   List<VibeBoard> _boards = [];
   List<CircleMembership> _members = [];
-  
+
+   StreamSubscription<List<CircleActivity>>? _activitySubscription;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _loadCircleData();
+    _listenToActivities();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _activitySubscription?.cancel();
     super.dispose();
+  }
+
+  void _listenToActivities() {
+    _activitySubscription = _circleService
+        .getCircleFeed(widget.circleId)
+        .listen((activities) {
+      if (mounted) {
+        setState(() => _activities = activities);
+      }
+    });
   }
 
   Future<void> _loadCircleData() async {
@@ -493,7 +509,7 @@ class _CircleDetailScreenState extends State<CircleDetailScreen>
     );
   }
 
-  Widget _buildFeedTab() {
+ Widget _buildFeedTab() {
     if (_activities.isEmpty) {
       return _buildEmptyState(
         icon: Icons.timeline,
@@ -505,24 +521,24 @@ class _CircleDetailScreenState extends State<CircleDetailScreen>
     }
 
     return RefreshIndicator(
-      onRefresh: _loadActivities,
+      onRefresh: () async {
+        // The stream will automatically update
+      },
       child: ListView.builder(
         padding: const EdgeInsets.only(top: 16, bottom: 80),
         itemCount: _activities.length,
         itemBuilder: (context, index) {
           return CircleActivityCard(
             activity: _activities[index],
-            onLike: () {
-              // TODO: Implement like
-            },
-            onComment: () {
-              // TODO: Implement comment
+            onActivityUpdate: () {
+              // The stream will automatically update
             },
           );
         },
       ),
     );
   }
+
 
   Widget _buildBoardsTab() {
     if (_boards.isEmpty) {

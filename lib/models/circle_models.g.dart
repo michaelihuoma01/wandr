@@ -122,6 +122,11 @@ CircleActivity _$CircleActivityFromJson(Map<String, dynamic> json) =>
               ?.map((e) => ActivityComment.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
+      reactions: (json['reactions'] as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry(
+                k, (e as List<dynamic>).map((e) => e as String).toList()),
+          ) ??
+          const {},
     );
 
 Map<String, dynamic> _$CircleActivityToJson(CircleActivity instance) =>
@@ -136,6 +141,7 @@ Map<String, dynamic> _$CircleActivityToJson(CircleActivity instance) =>
       'timestamp': instance.timestamp.toIso8601String(),
       'likedBy': instance.likedBy,
       'comments': instance.comments,
+      'reactions': instance.reactions,
     };
 
 const _$ActivityTypeEnumMap = {
@@ -149,16 +155,20 @@ const _$ActivityTypeEnumMap = {
 
 ActivityComment _$ActivityCommentFromJson(Map<String, dynamic> json) =>
     ActivityComment(
+      id: json['id'] as String,
       userId: json['userId'] as String,
       userName: json['userName'] as String,
+      userPhotoUrl: json['userPhotoUrl'] as String?,
       text: json['text'] as String,
       timestamp: DateTime.parse(json['timestamp'] as String),
     );
 
 Map<String, dynamic> _$ActivityCommentToJson(ActivityComment instance) =>
     <String, dynamic>{
+      'id': instance.id,
       'userId': instance.userId,
       'userName': instance.userName,
+      'userPhotoUrl': instance.userPhotoUrl,
       'text': instance.text,
       'timestamp': instance.timestamp.toIso8601String(),
     };

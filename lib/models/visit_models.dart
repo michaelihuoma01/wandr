@@ -23,6 +23,25 @@ class PlaceVisit {
   final int? rating;
   final String? address;
   final Map<String, dynamic>? placeDetails; // Store additional place info
+  
+  // Enhanced verification fields
+  final bool isVerified; // GPS verification within 500m
+  final double? verificationDistance; // Distance from place when checked in
+  final DateTime? actualVisitTime; // For delayed check-ins, when they were actually there
+  final bool hasDelayedCheckIn; // If checked in after 24h grace period
+  
+  // Photo verification fields
+  final bool hasVerifiedPhoto; // AI verified photo
+  final double? photoCredibilityScore; // AI confidence score (0-1)
+  final String? photoAnalysis; // AI analysis results
+  final List<String>? instantVibeTags; // AI-suggested vibe tags from photo
+  
+  // Check-in story
+  final String? storyCaption; // User's story caption
+  final bool isStoryPublic; // Share story publicly
+  
+  // Trust score impact
+  final int vibeCred; // Credibility points earned from this check-in
 
   PlaceVisit({
     required this.id,
@@ -42,6 +61,21 @@ class PlaceVisit {
     this.rating,
     this.address,
     this.placeDetails,
+    // Enhanced verification fields
+    this.isVerified = false,
+    this.verificationDistance,
+    this.actualVisitTime,
+    this.hasDelayedCheckIn = false,
+    // Photo verification fields
+    this.hasVerifiedPhoto = false,
+    this.photoCredibilityScore,
+    this.photoAnalysis,
+    this.instantVibeTags,
+    // Check-in story
+    this.storyCaption,
+    this.isStoryPublic = false,
+    // Trust score impact
+    this.vibeCred = 0,
   });
 
   factory PlaceVisit.fromJson(Map<String, dynamic> json) => _$PlaceVisitFromJson(json);
@@ -67,6 +101,21 @@ class PlaceVisit {
       rating: data['rating'],
       address: data['address'],
       placeDetails: data['placeDetails'],
+      // Enhanced verification fields
+      isVerified: data['isVerified'] ?? false,
+      verificationDistance: data['verificationDistance']?.toDouble(),
+      actualVisitTime: data['actualVisitTime'] != null ? (data['actualVisitTime'] as Timestamp).toDate() : null,
+      hasDelayedCheckIn: data['hasDelayedCheckIn'] ?? false,
+      // Photo verification fields
+      hasVerifiedPhoto: data['hasVerifiedPhoto'] ?? false,
+      photoCredibilityScore: data['photoCredibilityScore']?.toDouble(),
+      photoAnalysis: data['photoAnalysis'],
+      instantVibeTags: data['instantVibeTags'] != null ? List<String>.from(data['instantVibeTags']) : null,
+      // Check-in story
+      storyCaption: data['storyCaption'],
+      isStoryPublic: data['isStoryPublic'] ?? false,
+      // Trust score impact
+      vibeCred: data['vibeCred'] ?? 0,
     );
   }
 
@@ -88,6 +137,21 @@ class PlaceVisit {
       'rating': rating,
       'address': address,
       'placeDetails': placeDetails,
+      // Enhanced verification fields
+      'isVerified': isVerified,
+      'verificationDistance': verificationDistance,
+      'actualVisitTime': actualVisitTime != null ? Timestamp.fromDate(actualVisitTime!) : null,
+      'hasDelayedCheckIn': hasDelayedCheckIn,
+      // Photo verification fields
+      'hasVerifiedPhoto': hasVerifiedPhoto,
+      'photoCredibilityScore': photoCredibilityScore,
+      'photoAnalysis': photoAnalysis,
+      'instantVibeTags': instantVibeTags,
+      // Check-in story
+      'storyCaption': storyCaption,
+      'isStoryPublic': isStoryPublic,
+      // Trust score impact
+      'vibeCred': vibeCred,
     };
   }
 }
@@ -211,4 +275,176 @@ class VisitFilter {
     startDate != null || 
     endDate != null || 
     showOnlyManualCheckIns;
+}
+
+// User trust score and badges
+@JsonSerializable()
+class UserVibeScore {
+  final String userId;
+  final int totalCredPoints;
+  final int verifiedCheckIns;
+  final int photoUploads;
+  final int communityLikes;
+  final List<String> badges;
+  final DateTime lastUpdated;
+  final int level; // 1-10 based on total points
+  final String title; // e.g., "Local Tastemaker", "Vibe Explorer"
+
+  UserVibeScore({
+    required this.userId,
+    required this.totalCredPoints,
+    required this.verifiedCheckIns,
+    required this.photoUploads,
+    required this.communityLikes,
+    required this.badges,
+    required this.lastUpdated,
+    required this.level,
+    required this.title,
+  });
+
+  factory UserVibeScore.fromJson(Map<String, dynamic> json) => _$UserVibeScoreFromJson(json);
+  Map<String, dynamic> toJson() => _$UserVibeScoreToJson(this);
+
+  factory UserVibeScore.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return UserVibeScore(
+      userId: doc.id,
+      totalCredPoints: data['totalCredPoints'] ?? 0,
+      verifiedCheckIns: data['verifiedCheckIns'] ?? 0,
+      photoUploads: data['photoUploads'] ?? 0,
+      communityLikes: data['communityLikes'] ?? 0,
+      badges: List<String>.from(data['badges'] ?? []),
+      lastUpdated: (data['lastUpdated'] as Timestamp).toDate(),
+      level: data['level'] ?? 1,
+      title: data['title'] ?? 'Vibe Newcomer',
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'totalCredPoints': totalCredPoints,
+      'verifiedCheckIns': verifiedCheckIns,
+      'photoUploads': photoUploads,
+      'communityLikes': communityLikes,
+      'badges': badges,
+      'lastUpdated': Timestamp.fromDate(lastUpdated),
+      'level': level,
+      'title': title,
+    };
+  }
+}
+
+// Check-in verification result
+class CheckInVerification {
+  final bool isWithinRadius;
+  final double distanceFromPlace;
+  final bool isWithinGracePeriod;
+  final bool canCheckIn;
+  final String? error;
+  final DateTime? lastCheckInToday;
+
+  CheckInVerification({
+    required this.isWithinRadius,
+    required this.distanceFromPlace,
+    required this.isWithinGracePeriod,
+    required this.canCheckIn,
+    this.error,
+    this.lastCheckInToday,
+  });
+}
+
+// Photo verification result
+class PhotoVerificationResult {
+  final bool isValid;
+  final double credibilityScore; // 0-1
+  final bool isRecent; // Within 24 hours
+  final bool isOriginal; // Not screenshot/stock
+  final bool isRelevant; // Matches venue
+  final List<String> suggestedTags;
+  final String analysis;
+  final String? error;
+
+  PhotoVerificationResult({
+    required this.isValid,
+    required this.credibilityScore,
+    required this.isRecent,
+    required this.isOriginal,
+    required this.isRelevant,
+    required this.suggestedTags,
+    required this.analysis,
+    this.error,
+  });
+}
+
+// Badge definitions
+class VibeBadge {
+  final String id;
+  final String name;
+  final String description;
+  final String emoji;
+  final int requiredPoints;
+  final Map<String, int> requirements; // e.g., {'verified_checkins': 50}
+
+  const VibeBadge({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.emoji,
+    required this.requiredPoints,
+    required this.requirements,
+  });
+}
+
+// Predefined badges
+class VibeBadges {
+  static const List<VibeBadge> allBadges = [
+    VibeBadge(
+      id: 'newcomer',
+      name: 'Vibe Newcomer',
+      description: 'Welcome to the community!',
+      emoji: '🌟',
+      requiredPoints: 0,
+      requirements: {},
+    ),
+    VibeBadge(
+      id: 'explorer',
+      name: 'Vibe Explorer',
+      description: 'Checked into 10 different places',
+      emoji: '🗺️',
+      requiredPoints: 100,
+      requirements: {'unique_places': 10},
+    ),
+    VibeBadge(
+      id: 'photographer',
+      name: 'Vibe Photographer',
+      description: 'Uploaded 25 verified photos',
+      emoji: '📸',
+      requiredPoints: 250,
+      requirements: {'verified_photos': 25},
+    ),
+    VibeBadge(
+      id: 'local_tastemaker',
+      name: 'Local Tastemaker',
+      description: 'Trusted by the community',
+      emoji: '👑',
+      requiredPoints: 500,
+      requirements: {'verified_checkins': 50, 'community_likes': 100},
+    ),
+    VibeBadge(
+      id: 'vibe_master',
+      name: 'Vibe Master',
+      description: 'The ultimate vibe curator',
+      emoji: '🏆',
+      requiredPoints: 1000,
+      requirements: {'verified_checkins': 100, 'verified_photos': 50, 'community_likes': 200},
+    ),
+  ];
+
+  static VibeBadge? getBadgeById(String id) {
+    try {
+      return allBadges.firstWhere((badge) => badge.id == id);
+    } catch (e) {
+      return null;
+    }
+  }
 }

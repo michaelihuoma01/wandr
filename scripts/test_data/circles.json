@@ -1,0 +1,119 @@
+[
+  {
+    "id": "circle_foodies_nyc",
+    "name": "NYC Foodies",
+    "description": "Exploring the best restaurants and hidden culinary gems across all five boroughs",
+    "createdBy": "user_alex_123",
+    "members": [
+      "user_alex_123",
+      "user_sara_456",
+      "user_mike_789",
+      "user_emma_012"
+    ],
+    "memberCount": 4,
+    "isPublic": true,
+    "createdAt": "2025-06-28T08:22:16.755428",
+    "updatedAt": "2025-06-30T17:12:16.756560",
+    "tags": [
+      "food",
+      "restaurants",
+      "nyc",
+      "dining"
+    ],
+    "activityCount": 24,
+    "coverPhoto": "https://images.unsplash.com/photo-1555396273-367ea4eb4db5"
+  },
+  {
+    "id": "circle_adventure_seekers",
+    "name": "Adventure Seekers",
+    "description": "Always ready for the next exciting outdoor experience and urban exploration",
+    "createdBy": "user_emma_012",
+    "members": [
+      "user_emma_012",
+      "user_james_345",
+      "user_alex_123"
+    ],
+    "memberCount": 3,
+    "isPublic": true,
+    "createdAt": "2025-05-29T19:00:16.756624",
+    "updatedAt": "2025-06-30T00:13:16.756631",
+    "tags": [
+      "adventure",
+      "outdoors",
+      "exploration",
+      "active"
+    ],
+    "activityCount": 18,
+    "coverPhoto": "https://images.unsplash.com/photo-1551632811-561732d1e306"
+  },
+  {
+    "id": "circle_art_culture",
+    "name": "Art & Culture Lovers",
+    "description": "Passionate about museums, galleries, theater, and all things cultural",
+    "createdBy": "user_sara_456",
+    "members": [
+      "user_sara_456",
+      "user_james_345",
+      "user_mike_789"
+    ],
+    "memberCount": 3,
+    "isPublic": false,
+    "createdAt": "2025-06-09T19:39:16.756642",
+    "updatedAt": "2025-06-30T22:07:16.756648",
+    "tags": [
+      "art",
+      "culture",
+      "museums",
+      "galleries"
+    ],
+    "activityCount": 15,
+    "coverPhoto": "https://images.unsplash.com/photo-1541961017774-22349e4a1262"
+  },
+  {
+    "id": "circle_night_owls",
+    "name": "Night Owls",
+    "description": "Discovering the best nightlife, bars, and late-night entertainment venues",
+    "createdBy": "user_mike_789",
+    "members": [
+      "user_mike_789",
+      "user_alex_123",
+      "user_sara_456",
+      "user_emma_012",
+      "user_james_345"
+    ],
+    "memberCount": 5,
+    "isPublic": true,
+    "createdAt": "2025-06-04T16:47:16.756689",
+    "updatedAt": "2025-06-29T11:27:16.756695",
+    "tags": [
+      "nightlife",
+      "bars",
+      "entertainment",
+      "late-night"
+    ],
+    "activityCount": 31,
+    "coverPhoto": "https://images.unsplash.com/photo-1566737236500-c8ac43014a8e"
+  },
+  {
+    "id": "circle_coffee_enthusiasts",
+    "name": "Coffee Enthusiasts",
+    "description": "On a mission to find the perfect cup at the city's best coffee shops",
+    "createdBy": "user_sara_456",
+    "members": [
+      "user_sara_456",
+      "user_james_345"
+    ],
+    "memberCount": 2,
+    "isPublic": true,
+    "createdAt": "2025-06-26T04:04:16.756707",
+    "updatedAt": "2025-07-01T04:07:16.756712",
+    "tags": [
+      "coffee",
+      "cafes",
+      "morning",
+      "local"
+    ],
+    "activityCount": 12,
+    "coverPhoto": "https://images.unsplash.com/photo-1445116572660-236099ec97a0"
+  }
+]

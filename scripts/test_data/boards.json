@@ -1,0 +1,642 @@
+[
+  {
+    "id": "board_perfect_date_night",
+    "name": "Perfect Date Night in NYC",
+    "description": "A romantic evening itinerary with stunning views, amazing food, and intimate vibes",
+    "createdBy": "user_alex_123",
+    "createdAt": "2025-06-26T09:25:16.760500",
+    "updatedAt": "2025-06-24T14:54:16.760511",
+    "isPublic": true,
+    "type": "itinerary",
+    "tags": [
+      "romantic",
+      "date",
+      "evening",
+      "nyc"
+    ],
+    "coverPhotoUrl": "https://images.unsplash.com/photo-1519741497674-611481863552",
+    "likeCount": 47,
+    "saveCount": 23,
+    "enhancedCategories": [
+      {
+        "categoryTitle": "With a View",
+        "categoryDescription": "Sunset rooftop bars and scenic spots to set the mood",
+        "timeSlot": "sunset",
+        "order": 1,
+        "places": [
+          {
+            "name": "Sunset Rooftop Bar",
+            "description": "Panoramic city views with craft cocktails",
+            "latitude": 40.7589,
+            "longitude": -73.9851,
+            "type": "bar",
+            "rating": 4.6,
+            "priceLevel": "$$$$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1574391884720-bfce7feac425"
+            ],
+            "tags": [
+              "local",
+              "afternoon"
+            ],
+            "phoneNumber": "+1 (235) 914-1642",
+            "websiteUrl": "https://example.com/sunsetrooftopbar"
+          },
+          {
+            "name": "Edge Observation Deck",
+            "description": "Highest outdoor sky deck in the Western Hemisphere",
+            "latitude": 40.7576,
+            "longitude": -74.0014,
+            "type": "attraction",
+            "rating": 4.8,
+            "priceLevel": "$$$$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1506905925346-21bda4d32df4"
+            ],
+            "tags": [
+              "indoor",
+              "evening",
+              "drinks",
+              "food",
+              "romantic"
+            ],
+            "phoneNumber": "+1 (110) 390-6163",
+            "websiteUrl": "https://example.com/edgeobservationdeck"
+          },
+          {
+            "name": "Brooklyn Bridge Park",
+            "description": "Waterfront park with Manhattan skyline views",
+            "latitude": 40.7023,
+            "longitude": -73.9976,
+            "type": "park",
+            "rating": 4.7,
+            "priceLevel": "$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1572986945473-b2bc53b5bdcd"
+            ],
+            "tags": [
+              "nature",
+              "romantic",
+              "music"
+            ],
+            "phoneNumber": "+1 (974) 790-2261",
+            "websiteUrl": "https://example.com/brooklynbridgepark"
+          }
+        ]
+      },
+      {
+        "categoryTitle": "Fine Dining",
+        "categoryDescription": "Exquisite restaurants for an unforgettable dinner",
+        "timeSlot": "dinner",
+        "order": 2,
+        "places": [
+          {
+            "name": "Le Bernardin",
+            "description": "Michelin-starred French seafood restaurant",
+            "latitude": 40.7614,
+            "longitude": -73.9776,
+            "type": "restaurant",
+            "rating": 4.9,
+            "priceLevel": "$$$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4"
+            ],
+            "tags": [
+              "nature",
+              "morning",
+              "upscale",
+              "outdoor"
+            ],
+            "phoneNumber": "+1 (403) 844-3147",
+            "websiteUrl": "https://example.com/lebernardin"
+          },
+          {
+            "name": "Corner Bistro",
+            "description": "Intimate French bistro with authentic cuisine",
+            "latitude": 40.7505,
+            "longitude": -73.9934,
+            "type": "restaurant",
+            "rating": 4.8,
+            "priceLevel": "$$$$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4"
+            ],
+            "tags": [
+              "music",
+              "popular",
+              "family",
+              "indoor",
+              "morning"
+            ],
+            "phoneNumber": "+1 (269) 567-6169",
+            "websiteUrl": "https://example.com/cornerbistro"
+          },
+          {
+            "name": "The Modern",
+            "description": "Contemporary American cuisine with MoMA views",
+            "latitude": 40.7616,
+            "longitude": -73.9776,
+            "type": "restaurant",
+            "rating": 4.7,
+            "priceLevel": "$$$$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4"
+            ],
+            "tags": [
+              "nature",
+              "outdoor",
+              "night",
+              "group",
+              "evening"
+            ],
+            "phoneNumber": "+1 (733) 565-4723",
+            "websiteUrl": "https://example.com/themodern"
+          }
+        ]
+      },
+      {
+        "categoryTitle": "Party All Night",
+        "categoryDescription": "Vibrant nightlife spots to dance the night away",
+        "timeSlot": "night",
+        "order": 3,
+        "places": [
+          {
+            "name": "Blue Note Jazz Club",
+            "description": "Legendary jazz club with intimate performances",
+            "latitude": 40.7295,
+            "longitude": -74.0009,
+            "type": "entertainment",
+            "rating": 4.7,
+            "priceLevel": "$$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f"
+            ],
+            "tags": [
+              "evening",
+              "popular",
+              "romantic",
+              "solo"
+            ],
+            "phoneNumber": "+1 (759) 609-4981",
+            "websiteUrl": "https://example.com/bluenotejazzclub"
+          },
+          {
+            "name": "Speakeasy Lounge",
+            "description": "Hidden cocktail bar with prohibition-era charm",
+            "latitude": 40.74,
+            "longitude": -73.99,
+            "type": "bar",
+            "rating": 4.4,
+            "priceLevel": "$$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1574391884720-bfce7feac425"
+            ],
+            "tags": [
+              "music",
+              "local",
+              "food"
+            ],
+            "phoneNumber": "+1 (398) 739-3058",
+            "websiteUrl": "https://example.com/speakeasylounge"
+          },
+          {
+            "name": "Rooftop Nightclub",
+            "description": "Open-air dancing under the stars",
+            "latitude": 40.758,
+            "longitude": -73.9855,
+            "type": "nightclub",
+            "rating": 4.5,
+            "priceLevel": "$$$$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1506905925346-21bda4d32df4"
+            ],
+            "tags": [
+              "romantic",
+              "hidden"
+            ],
+            "phoneNumber": "+1 (794) 408-3953",
+            "websiteUrl": "https://example.com/rooftopnightclub"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "board_weekend_warriors",
+    "name": "Weekend Adventure Guide",
+    "description": "Action-packed weekend itinerary for thrill-seekers and outdoor enthusiasts",
+    "createdBy": "user_emma_012",
+    "createdAt": "2025-06-24T05:29:16.761566",
+    "updatedAt": "2025-06-28T16:19:16.761578",
+    "isPublic": true,
+    "type": "itinerary",
+    "tags": [
+      "adventure",
+      "weekend",
+      "outdoor",
+      "active"
+    ],
+    "coverPhotoUrl": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4",
+    "likeCount": 38,
+    "saveCount": 19,
+    "enhancedCategories": [
+      {
+        "categoryTitle": "Start Strong",
+        "categoryDescription": "Energizing morning activities to kick off your adventure",
+        "timeSlot": "morning",
+        "order": 1,
+        "places": [
+          {
+            "name": "Central Park",
+            "description": "Iconic urban park perfect for morning runs and walks",
+            "latitude": 40.7829,
+            "longitude": -73.9654,
+            "type": "park",
+            "rating": 4.9,
+            "priceLevel": "$$$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1572986945473-b2bc53b5bdcd"
+            ],
+            "tags": [
+              "romantic",
+              "indoor"
+            ],
+            "phoneNumber": "+1 (931) 244-9220",
+            "websiteUrl": "https://example.com/centralpark"
+          },
+          {
+            "name": "Brooklyn Bridge",
+            "description": "Historic bridge walk with breathtaking views",
+            "latitude": 40.7061,
+            "longitude": -73.9969,
+            "type": "landmark",
+            "rating": 4.8,
+            "priceLevel": "$$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1506905925346-21bda4d32df4"
+            ],
+            "tags": [
+              "food",
+              "romantic"
+            ],
+            "phoneNumber": "+1 (353) 631-8701",
+            "websiteUrl": "https://example.com/brooklynbridge"
+          },
+          {
+            "name": "High Line",
+            "description": "Elevated park with unique urban garden experience",
+            "latitude": 40.748,
+            "longitude": -74.0048,
+            "type": "park",
+            "rating": 4.6,
+            "priceLevel": "$$$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1572986945473-b2bc53b5bdcd"
+            ],
+            "tags": [
+              "evening",
+              "group",
+              "date",
+              "coffee",
+              "night"
+            ],
+            "phoneNumber": "+1 (902) 802-2409",
+            "websiteUrl": "https://example.com/highline"
+          }
+        ]
+      },
+      {
+        "categoryTitle": "Main Event",
+        "categoryDescription": "Exciting activities and unique experiences",
+        "timeSlot": "afternoon",
+        "order": 2,
+        "places": [
+          {
+            "name": "Rock Climbing Gym",
+            "description": "Indoor climbing with city views",
+            "latitude": 40.7505,
+            "longitude": -73.987,
+            "type": "fitness",
+            "rating": 4.5,
+            "priceLevel": "$$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1506905925346-21bda4d32df4"
+            ],
+            "tags": [
+              "morning",
+              "solo",
+              "coffee",
+              "music",
+              "family"
+            ],
+            "phoneNumber": "+1 (893) 197-6833",
+            "websiteUrl": "https://example.com/rockclimbinggym"
+          },
+          {
+            "name": "Kayak Rental",
+            "description": "Paddle around Manhattan waterways",
+            "latitude": 40.7589,
+            "longitude": -73.9851,
+            "type": "outdoor",
+            "rating": 4.4,
+            "priceLevel": "$$$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1506905925346-21bda4d32df4"
+            ],
+            "tags": [
+              "romantic",
+              "art"
+            ],
+            "phoneNumber": "+1 (229) 510-9941",
+            "websiteUrl": "https://example.com/kayakrental"
+          },
+          {
+            "name": "Bike Tour",
+            "description": "Guided cycling tour through NYC boroughs",
+            "latitude": 40.7282,
+            "longitude": -73.9942,
+            "type": "tour",
+            "rating": 4.6,
+            "priceLevel": "$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1506905925346-21bda4d32df4"
+            ],
+            "tags": [
+              "local",
+              "upscale",
+              "morning",
+              "evening",
+              "family"
+            ],
+            "phoneNumber": "+1 (828) 907-1795",
+            "websiteUrl": "https://example.com/biketour"
+          }
+        ]
+      },
+      {
+        "categoryTitle": "Victory Lap",
+        "categoryDescription": "Celebrate your accomplishments with great food and drinks",
+        "timeSlot": "evening",
+        "order": 3,
+        "places": [
+          {
+            "name": "Sports Bar & Grill",
+            "description": "Casual dining with game day atmosphere",
+            "latitude": 40.74,
+            "longitude": -73.99,
+            "type": "restaurant",
+            "rating": 4.3,
+            "priceLevel": "$$$$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4"
+            ],
+            "tags": [
+              "family",
+              "drinks",
+              "morning"
+            ],
+            "phoneNumber": "+1 (808) 786-8179",
+            "websiteUrl": "https://example.com/sportsbar&grill"
+          },
+          {
+            "name": "Brewery Tour",
+            "description": "Local craft beer tasting experience",
+            "latitude": 40.7294,
+            "longitude": -73.9965,
+            "type": "brewery",
+            "rating": 4.5,
+            "priceLevel": "$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1506905925346-21bda4d32df4"
+            ],
+            "tags": [
+              "outdoor",
+              "morning",
+              "weekend"
+            ],
+            "phoneNumber": "+1 (439) 857-5213",
+            "websiteUrl": "https://example.com/brewerytour"
+          },
+          {
+            "name": "Victory Garden",
+            "description": "Rooftop bar celebrating outdoor adventures",
+            "latitude": 40.7576,
+            "longitude": -73.9857,
+            "type": "bar",
+            "rating": 4.4,
+            "priceLevel": "$",
+            "imageUrls": [
+              "https://images.unsplash.com/photo-1574391884720-bfce7feac425"
+            ],
+            "tags": [
+              "romantic",
+              "music"
+            ],
+            "phoneNumber": "+1 (548) 590-3868",
+            "websiteUrl": "https://example.com/victorygarden"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "board_hidden_gems",
+    "name": "NYC Hidden Gems",
+    "description": "Secret spots and local favorites that most tourists never discover",
+    "createdBy": "user_sara_456",
+    "createdAt": "2025-06-21T19:37:16.761701",
+    "updatedAt": "2025-06-27T19:05:16.761706",
+    "isPublic": false,
+    "type": "normal",
+    "tags": [
+      "hidden",
+      "local",
+      "unique",
+      "secret"
+    ],
+    "coverPhotoUrl": "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9",
+    "likeCount": 62,
+    "saveCount": 34,
+    "places": [
+      {
+        "name": "Secret Garden",
+        "description": "Hidden courtyard cafe known only to locals",
+        "latitude": 40.7282,
+        "longitude": -73.9942,
+        "type": "cafe",
+        "rating": 4.7,
+        "priceLevel": "$$$",
+        "imageUrls": [
+          "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb"
+        ],
+        "tags": [
+          "drinks",
+          "solo"
+        ],
+        "phoneNumber": "+1 (151) 921-5308",
+        "websiteUrl": "https://example.com/secretgarden"
+      },
+      {
+        "name": "Underground Speakeasy",
+        "description": "Unmarked bar in a basement below a pizza shop",
+        "latitude": 40.7295,
+        "longitude": -74.0009,
+        "type": "bar",
+        "rating": 4.8,
+        "priceLevel": "$$$",
+        "imageUrls": [
+          "https://images.unsplash.com/photo-1574391884720-bfce7feac425"
+        ],
+        "tags": [
+          "nature",
+          "art",
+          "solo"
+        ],
+        "phoneNumber": "+1 (520) 290-5712",
+        "websiteUrl": "https://example.com/undergroundspeakeasy"
+      },
+      {
+        "name": "Artisan Workshop",
+        "description": "Working artist studio that doubles as gallery",
+        "latitude": 40.7505,
+        "longitude": -73.9934,
+        "type": "gallery",
+        "rating": 4.6,
+        "priceLevel": "$$",
+        "imageUrls": [
+          "https://images.unsplash.com/photo-1506905925346-21bda4d32df4"
+        ],
+        "tags": [
+          "local",
+          "drinks",
+          "solo",
+          "art"
+        ],
+        "phoneNumber": "+1 (797) 316-1255",
+        "websiteUrl": "https://example.com/artisanworkshop"
+      },
+      {
+        "name": "Pocket Park",
+        "description": "Tiny green space between buildings most people miss",
+        "latitude": 40.7589,
+        "longitude": -73.9851,
+        "type": "park",
+        "rating": 4.5,
+        "priceLevel": "$$",
+        "imageUrls": [
+          "https://images.unsplash.com/photo-1572986945473-b2bc53b5bdcd"
+        ],
+        "tags": [
+          "family",
+          "group",
+          "night",
+          "date"
+        ],
+        "phoneNumber": "+1 (846) 112-4760",
+        "websiteUrl": "https://example.com/pocketpark"
+      }
+    ]
+  },
+  {
+    "id": "board_coffee_crawl",
+    "name": "Ultimate Coffee Crawl",
+    "description": "The best third-wave coffee shops for a perfect caffeine tour",
+    "createdBy": "user_james_345",
+    "createdAt": "2025-06-27T06:59:16.761762",
+    "updatedAt": "2025-06-28T17:11:16.761767",
+    "isPublic": true,
+    "type": "normal",
+    "tags": [
+      "coffee",
+      "morning",
+      "crawl",
+      "local"
+    ],
+    "coverPhotoUrl": "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb",
+    "likeCount": 29,
+    "saveCount": 18,
+    "places": [
+      {
+        "name": "Artisan Coffee House",
+        "description": "Third-wave coffee with locally roasted beans",
+        "latitude": 40.7282,
+        "longitude": -73.9942,
+        "type": "cafe",
+        "rating": 4.5,
+        "priceLevel": "$",
+        "imageUrls": [
+          "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb"
+        ],
+        "tags": [
+          "music",
+          "upscale",
+          "local",
+          "coffee"
+        ],
+        "phoneNumber": "+1 (675) 509-8710",
+        "websiteUrl": "https://example.com/artisancoffeehouse"
+      },
+      {
+        "name": "Steam & Bean",
+        "description": "Specialty espresso bar with minimal decor",
+        "latitude": 40.74,
+        "longitude": -73.99,
+        "type": "cafe",
+        "rating": 4.6,
+        "priceLevel": "$$$",
+        "imageUrls": [
+          "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb"
+        ],
+        "tags": [
+          "afternoon",
+          "indoor",
+          "upscale",
+          "nature",
+          "night"
+        ],
+        "phoneNumber": "+1 (149) 148-8707",
+        "websiteUrl": "https://example.com/steam&bean"
+      },
+      {
+        "name": "Morning Ritual",
+        "description": "Pour-over specialists with single-origin beans",
+        "latitude": 40.7505,
+        "longitude": -73.9934,
+        "type": "cafe",
+        "rating": 4.7,
+        "priceLevel": "$$$$",
+        "imageUrls": [
+          "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb"
+        ],
+        "tags": [
+          "food",
+          "weekend",
+          "upscale",
+          "romantic"
+        ],
+        "phoneNumber": "+1 (678) 585-8159",
+        "websiteUrl": "https://example.com/morningritual"
+      },
+      {
+        "name": "Caffeine Culture",
+        "description": "Modern coffee lab with innovative brewing methods",
+        "latitude": 40.7589,
+        "longitude": -73.9851,
+        "type": "cafe",
+        "rating": 4.4,
+        "priceLevel": "$$$",
+        "imageUrls": [
+          "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb"
+        ],
+        "tags": [
+          "romantic",
+          "upscale",
+          "hidden",
+          "family"
+        ],
+        "phoneNumber": "+1 (245) 605-8508",
+        "websiteUrl": "https://example.com/caffeineculture"
+      }
+    ]
+  }
+]
