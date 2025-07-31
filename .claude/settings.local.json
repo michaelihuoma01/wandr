@@ -18,7 +18,10 @@
       "Bash(grep:*)",
       "Bash(flutter build:*)",
       "Bash(flutter doctor:*)",
-      "Bash(flutter packages pub run build_runner build:*)"
+      "Bash(flutter packages pub run build_runner build:*)",
+      "Bash(dart analyze:*)",
+      "Bash(flutter pub:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
   }

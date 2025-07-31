@@ -1,6 +1,6 @@
 // lib/widgets/circle_card.dart
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+// Removed cached_network_image dependency - using NetworkImage instead
 import 'package:intl/intl.dart';
 import '../models/circle_models.dart';
 
@@ -8,12 +8,14 @@ class CircleCard extends StatelessWidget {
   final VibeCircle circle;
   final VoidCallback onTap;
   final bool showJoinButton;
+  final VoidCallback? onJoin;
 
   const CircleCard({
     super.key,
     required this.circle,
     required this.onTap,
     this.showJoinButton = false,
+    this.onJoin,
   });
 
   String _formatLastActivity(DateTime dateTime) {
@@ -122,7 +124,7 @@ class CircleCard extends StatelessWidget {
                   ),
                   if (showJoinButton)
                     ElevatedButton(
-                      onPressed: onTap,
+                      onPressed: onJoin ?? onTap,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).primaryColor,
                         shape: RoundedRectangleBorder(
@@ -250,7 +252,7 @@ class CircleCard extends StatelessWidget {
         tag: 'circle-avatar-${circle.id}',
         child: CircleAvatar(
           radius: 30,
-          backgroundImage: CachedNetworkImageProvider(circle.imageUrl!),
+          backgroundImage: NetworkImage(circle.imageUrl!),
           backgroundColor: Colors.grey[200],
         ),
       );

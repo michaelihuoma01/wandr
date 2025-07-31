@@ -6,6 +6,8 @@ import '../services/auth_service.dart';
 import '../services/user_profile_service.dart';
 import '../services/follow_service.dart';
 import '../services/user_initialization_service.dart';
+import '../services/visit_service.dart';
+import '../services/board_service.dart';
 import '../models/models.dart';
 import '../widgets/profile_tabs.dart';
 
@@ -23,10 +25,20 @@ class EnhancedProfileScreen extends StatefulWidget {
 
 class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
     with TickerProviderStateMixin {
+  
+  // Telescope-inspired color scheme
+  static const Color telescopeBeige = Color(0xFFF4F3F0);
+  static const Color telescopeBlue = Color(0xFF0671FF);
+  static const Color telescopeYellow = Color(0xFFE3F794);
+  static const Color telescopeCharcoal = Color(0xFF1A1915);
+  static const Color telescopeLightGrey = Color(0xFFF8F7F4);
+
   final AuthService _authService = AuthService();
   final UserProfileService _userProfileService = UserProfileService();
   final FollowService _followService = FollowService();
   final UserInitializationService _initService = UserInitializationService();
+  final VisitService _visitService = VisitService();
+  final BoardService _boardService = BoardService();
 
   late TabController _tabController;
   late AnimationController _auraController;
@@ -40,6 +52,10 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
   bool _isCurrentUser = false;
   bool _isFollowing = false;
   int _selectedTabIndex = 0;
+  int _visitCount = 0;
+  int _cityCount = 0;
+  int _photoCount = 0;
+  int _boardCount = 0;
 
   @override
   void initState() {
@@ -81,7 +97,7 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
   }
 
   void _setupTabs() {
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       setState(() {
         _selectedTabIndex = _tabController.index;
@@ -127,12 +143,12 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
         } catch (e) {
           print('Error creating EnhancedUser from data: $e');
           // Create a minimal user with fallback data
-          _user = _createFallbackUser(targetUserId, userDoc);
+          _user = await _createFallbackUser(targetUserId, userDoc);
         }
       } else {
         print('No user document found, creating fallback user');
         // Create a basic user profile if none exists
-        _user = _createFallbackUser(targetUserId, null);
+        _user = await _createFallbackUser(targetUserId, null);
       }
 
       // Load follow statistics
@@ -142,13 +158,17 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
       if (!_isCurrentUser) {
         _isFollowing = await _followService.isFollowing(currentUser.uid, targetUserId);
       }
+
+      // Load visit and board counts
+      await _loadVisitStats(targetUserId);
+      await _loadBoardCount(targetUserId);
     } catch (e) {
       print('Error loading profile data: $e');
       // Create a minimal fallback user even on error
       final currentUser = _authService.currentUser;
       if (currentUser != null) {
         final targetUserId = widget.userId ?? currentUser.uid;
-        _user = _createFallbackUser(targetUserId, null);
+        _user = await _createFallbackUser(targetUserId, null);
       }
     } finally {
       if (mounted) {
@@ -243,6 +263,64 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
     );
   }
 
+  Future<void> _loadVisitStats(String userId) async {
+    try {
+      final visitStats = await _visitService.getVisitStats();
+      final visits = await _visitService.getVisitHistory(limit: 1000).first;
+      
+      // Count unique cities
+      final uniqueCities = <String>{};
+      int photoCount = 0;
+      
+      for (final visit in visits) {
+        if (visit.address != null && visit.address!.isNotEmpty) {
+          // Extract city from address (this is a simplified approach)
+          final addressParts = visit.address!.split(',');
+          if (addressParts.isNotEmpty) {
+            uniqueCities.add(addressParts.last.trim());
+          }
+        }
+        
+        // Count photos
+        if (visit.photoUrls != null && visit.photoUrls!.isNotEmpty) {
+          photoCount += visit.photoUrls!.length;
+        }
+      }
+      
+      setState(() {
+        _visitCount = visitStats.totalVisits;
+        _cityCount = uniqueCities.length;
+        _photoCount = photoCount;
+      });
+    } catch (e) {
+      print('Error loading visit stats: $e');
+      setState(() {
+        _visitCount = 0;
+        _cityCount = 0;
+        _photoCount = 0;
+      });
+    }
+  }
+
+  Future<void> _loadBoardCount(String userId) async {
+    try {
+      // Query boards created by this user
+      final userBoards = await FirebaseFirestore.instance
+          .collection('boards')
+          .where('createdBy', isEqualTo: userId)
+          .get();
+      
+      setState(() {
+        _boardCount = userBoards.docs.length;
+      });
+    } catch (e) {
+      print('Error loading board count: $e');
+      setState(() {
+        _boardCount = 0;
+      });
+    }
+  }
+
   Future<void> _toggleFollow() async {
     if (_isCurrentUser || _user == null) return;
 
@@ -279,6 +357,58 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
     }
   }
 
+  void _showProfileOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.share),
+              title: const Text('Share Profile'),
+              onTap: () {
+                Navigator.pop(context);
+                // Add share functionality
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.report),
+              title: const Text('Report User'),
+              onTap: () {
+                Navigator.pop(context);
+                // Add report functionality
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.block),
+              title: const Text('Block User'),
+              onTap: () {
+                Navigator.pop(context);
+                // Add block functionality
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -290,6 +420,31 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: telescopeBeige,
+      appBar: !_isCurrentUser ? AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new, color: Colors.grey[800], size: 22),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: _user != null ? Text(
+          _user!.name,
+          style: TextStyle(
+            color: Colors.grey[800],
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ) : null,
+        centerTitle: false,
+        actions: [
+          if (_user != null)
+            IconButton(
+              icon: Icon(Icons.more_vert, color: Colors.grey[600]),
+              onPressed: () => _showProfileOptions(),
+            ),
+        ],
+      ) : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _user == null
@@ -350,11 +505,11 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
       headerSliverBuilder: (context, innerBoxIsScrolled) {
         return [
           SliverAppBar(
-            expandedHeight: 300,
+            expandedHeight: 250,
             floating: false,
             pinned: true,
             elevation: 0,
-            backgroundColor: Colors.white,
+            backgroundColor: telescopeLightGrey,
             flexibleSpace: FlexibleSpaceBar(
               background: _buildProfileHeader(),
             ),
@@ -372,15 +527,13 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
             delegate: _TabBarDelegate(
               TabBar(
                 controller: _tabController,
-                indicatorColor: Theme.of(context).primaryColor,
-                labelColor: Theme.of(context).primaryColor,
-                unselectedLabelColor: Colors.grey[600],
+                indicatorColor: telescopeBlue,
+                labelColor: telescopeBlue,
+                unselectedLabelColor: telescopeCharcoal.withOpacity(0.6),
                 tabs: const [
-                  Tab(text: 'Overview'),
+                  Tab(text: 'Profile'),
                   Tab(text: 'My Journey'),
-                  Tab(text: 'Following'),
-                  Tab(text: 'Followers'),
-                  Tab(text: 'Insights'),
+                  Tab(text: 'Boards'),
                 ],
               ),
             ),
@@ -391,11 +544,9 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildOverviewTab(),
+          _buildProfileTab(),
           _buildMyJourneyTab(),
-          _buildFollowingTab(),
-          _buildFollowersTab(),
-          _buildInsightsTab(),
+          _buildBoardsTab(),
         ],
       ),
     );
@@ -408,23 +559,23 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Theme.of(context).primaryColor.withOpacity(0.1),
-            Colors.white,
+            telescopeBlue.withOpacity(0.08),
+            telescopeBeige,
           ],
         ),
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
-              const SizedBox(height: 20),
+              const SizedBox(height: 10),
               _buildVibeAuraAvatar(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _buildUserInfo(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
               _buildStatsRow(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               if (!_isCurrentUser) _buildFollowButton(),
             ],
           ),
@@ -501,72 +652,133 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
   Widget _buildUserInfo() {
     final vibeTitle = _user?.vibeTitle;
     
-    return Column(
-      children: [
-        Text(
-          _user?.name ?? 'Unknown User',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 4),
-        if (vibeTitle != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        children: [
+          Text(
+            _user?.name ?? 'Unknown User',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
-            child: Text(
-              vibeTitle,
-              style: TextStyle(
-                color: Theme.of(context).primaryColor,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          if (vibeTitle != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                vibeTitle,
+                style: TextStyle(
+                  color: Theme.of(context).primaryColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
+          const SizedBox(height: 8),
+          Text(
+            _user?.bio ?? 'Exploring the world, one vibe at a time ✨',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
           ),
-        const SizedBox(height: 8),
-        Text(
-          _user?.bio ?? 'Exploring the world, one vibe at a time ✨',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Colors.grey[600],
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildStatsRow() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _buildStatItem('Posts', '42'),
-        _buildStatItem('Followers', '${_followStats?.followersCount ?? 0}'),
-        _buildStatItem('Following', '${_followStats?.followingCount ?? 0}'),
-        _buildStatItem('Vibe Score', '${_calculateVibeScore()}'),
-      ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildClickableStatItem(
+            'Places', 
+            '$_visitCount',
+            () {
+              // Navigate to My Journey tab
+              _tabController.animateTo(1);
+            },
+          ),
+          _buildClickableStatItem(
+            'Followers', 
+            '${_followStats?.followersCount ?? 0}',
+            () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => Scaffold(
+                    appBar: AppBar(
+                      title: const Text('Followers'),
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
+                    ),
+                    body: FollowersTab(userId: widget.userId ?? _authService.currentUser!.uid),
+                  ),
+                ),
+              );
+            },
+          ),
+          _buildClickableStatItem(
+            'Following', 
+            '${_followStats?.followingCount ?? 0}',
+            () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => Scaffold(
+                    appBar: AppBar(
+                      title: const Text('Following'),
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
+                    ),
+                    body: FollowingTab(userId: widget.userId ?? _authService.currentUser!.uid),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildStatItem(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).primaryColor,
+  Widget _buildClickableStatItem(String label, String value, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+            textAlign: TextAlign.center,
           ),
-        ),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.grey[600],
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -597,19 +809,19 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
     );
   }
 
-  Widget _buildOverviewTab() {
+  Widget _buildProfileTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildEnhancedStatsRow(),
+          const SizedBox(height: 20),
+          _buildNextStopSection(),
+          const SizedBox(height: 20),
           _buildVibeDNA(),
-          const SizedBox(height: 24),
-          _buildVibeEvolution(),
-          const SizedBox(height: 24),
-          _buildSocialActivity(),
-          const SizedBox(height: 24),
-          _buildQuickStats(),
+          const SizedBox(height: 20),
+          _buildRecentActivitySection(),
         ],
       ),
     );
@@ -619,129 +831,135 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
     return MyJourneyTab(userId: widget.userId ?? _authService.currentUser!.uid);
   }
 
-  Widget _buildFollowingTab() {
-    return FollowingTab(userId: widget.userId ?? _authService.currentUser!.uid);
-  }
-
-  Widget _buildFollowersTab() {
-    return FollowersTab(userId: widget.userId ?? _authService.currentUser!.uid);
-  }
-
-  Widget _buildInsightsTab() {
-    return InsightsTab(userId: widget.userId ?? _authService.currentUser!.uid);
-  }
-
-  Widget _buildVibeDNA() {
-    final primaryVibes = _user?.vibeProfile?.primaryVibes ?? [];
-    
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Vibe DNA',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: primaryVibes.map((vibe) => _buildVibeChip(vibe)).toList(),
-            ),
-          ],
-        ),
+  Widget _buildBoardsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildBoardsHeader(),
+          const SizedBox(height: 16),
+          _buildBoardsGrid(),
+        ],
       ),
     );
   }
 
-  Widget _buildVibeChip(String vibe) {
-    final colors = _getVibeColors(vibe);
-    
+  int _getPlacesVisitedCount() {
+    // This will be updated with real visit count from service
+    return 0;
+  }
+
+  Widget _buildEnhancedStatsRow() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: colors.first.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.first),
+        color: telescopeLightGrey,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: telescopeCharcoal.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: Text(
-        vibe.capitalize(),
-        style: TextStyle(
-          color: colors.first,
-          fontWeight: FontWeight.w500,
-          fontSize: 12,
-        ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildTelescopeStatItem(
+                'Places', 
+                '$_visitCount',
+                Icons.location_on_outlined,
+                () {
+                  _tabController.animateTo(1);
+                },
+              ),
+              _buildTelescopeStatItem(
+                'Following', 
+                '${_followStats?.followingCount ?? 0}',
+                Icons.people_outline,
+                () => _navigateToFollowing(),
+              ),
+              _buildTelescopeStatItem(
+                'Followers', 
+                '${_followStats?.followersCount ?? 0}',
+                Icons.favorite_outline,
+                () => _navigateToFollowers(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Divider(color: telescopeCharcoal.withOpacity(0.1), thickness: 1),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildTelescopeStatItem(
+                'Reviews', 
+                '${_visitCount}', // Using visit count as reviews for now
+                Icons.rate_review_outlined,
+                () {},
+              ),
+              _buildTelescopeStatItem(
+                'Ratings', 
+                '4.2', // Mock rating
+                Icons.star_outline,
+                () {},
+              ),
+              _buildTelescopeStatItem(
+                'Activity', 
+                '${_calculateActivityScore()}',
+                Icons.timeline_outlined,
+                () {},
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildVibeEvolution() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+  Widget _buildTelescopeStatItem(String label, String value, IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: telescopeCharcoal.withOpacity(0.08),
+            width: 1,
+          ),
+        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.trending_up,
-                  color: Theme.of(context).primaryColor,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Vibe Evolution',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+            Icon(
+              icon,
+              color: telescopeBlue,
+              size: 24,
             ),
-            const SizedBox(height: 12),
-            Container(
-              height: 100,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Theme.of(context).primaryColor.withOpacity(0.1),
-                    Theme.of(context).primaryColor.withOpacity(0.05),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(8),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: telescopeCharcoal,
+                letterSpacing: -0.5,
               ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.auto_graph,
-                      color: Theme.of(context).primaryColor,
-                      size: 32,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Growing More Social',
-                      style: TextStyle(
-                        color: Theme.of(context).primaryColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      '+15% this month',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: telescopeCharcoal.withOpacity(0.6),
+                letterSpacing: 0.2,
               ),
             ),
           ],
@@ -750,111 +968,265 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
     );
   }
 
-  Widget _buildSocialActivity() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.people,
-                  color: Theme.of(context).primaryColor,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Social Activity',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _buildActivityItem(
-              'New follower: Alex joined your vibe tribe',
-              '2h ago',
-              Icons.person_add,
-              Colors.blue,
-            ),
-            const SizedBox(height: 8),
-            _buildActivityItem(
-              'High vibe match with Sarah found',
-              '5h ago',
-              Icons.favorite,
-              Colors.pink,
-            ),
-            const SizedBox(height: 8),
-            _buildActivityItem(
-              'Checked in at trendy rooftop bar',
-              '1d ago',
-              Icons.location_pin,
-              Colors.green,
-            ),
-          ],
-        ),
+  Widget _buildNextStopSection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: telescopeCharcoal.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildQuickStats() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
               children: [
-                Icon(
-                  Icons.insights,
-                  color: Theme.of(context).primaryColor,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'This Month',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: telescopeYellow.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard('Places\nVisited', '12', Icons.location_pin),
+                  child: Icon(
+                    Icons.bookmark_outline,
+                    color: telescopeCharcoal,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _buildStatCard('New\nConnections', '8', Icons.people),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Next Stop',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: telescopeCharcoal,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Places you want to explore',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: telescopeCharcoal.withOpacity(0.6),
+                          letterSpacing: 0.1,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard('Vibe\nMatches', '15', Icons.favorite),
+                TextButton(
+                  onPressed: () {
+                    // Navigate to full wishlist
+                  },
+                  child: Text(
+                    'View All',
+                    style: TextStyle(
+                      color: telescopeBlue,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          SizedBox(
+            height: 140,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: 5, // Mock data
+              itemBuilder: (context, index) {
+                return Container(
+                  width: 120,
+                  margin: const EdgeInsets.only(right: 12, bottom: 20),
+                  decoration: BoxDecoration(
+                    color: telescopeLightGrey,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: telescopeCharcoal.withOpacity(0.08),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 80,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              telescopeBlue.withOpacity(0.3),
+                              telescopeYellow.withOpacity(0.3),
+                            ],
+                          ),
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.place_outlined,
+                            color: telescopeCharcoal,
+                            size: 32,
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Text(
+                          'Place ${index + 1}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: telescopeCharcoal,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildActivityItem(String text, String time, IconData icon, Color color) {
+  Widget _buildRecentActivitySection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: telescopeCharcoal.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: telescopeBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.history,
+                  color: telescopeBlue,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Recent Activity',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: telescopeCharcoal,
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Mock activity items
+          for (int i = 0; i < 3; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: telescopeLightGrey,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.location_on,
+                      color: telescopeBlue,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Visited a new place',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: telescopeCharcoal,
+                          ),
+                        ),
+                        Text(
+                          '2 hours ago',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: telescopeCharcoal.withOpacity(0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              // Show full activity
+            },
+            child: Text(
+              'View All Activity',
+              style: TextStyle(
+                color: telescopeBlue,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBoardsHeader() {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
+            color: telescopeYellow.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, size: 16, color: color),
+          child: Icon(
+            Icons.dashboard_outlined,
+            color: telescopeCharcoal,
+            size: 24,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -862,61 +1234,585 @@ class _EnhancedProfileScreenState extends State<EnhancedProfileScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                text,
-                style: const TextStyle(fontSize: 14),
+                'My Boards',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: telescopeCharcoal,
+                  letterSpacing: -0.3,
+                ),
               ),
               Text(
-                time,
+                'Curated collections of places',
                 style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[500],
+                  fontSize: 14,
+                  color: telescopeCharcoal.withOpacity(0.6),
                 ),
               ),
             ],
+          ),
+        ),
+        IconButton(
+          onPressed: () {
+            // Create new board
+          },
+          icon: Icon(
+            Icons.add_circle_outline,
+            color: telescopeBlue,
+            size: 24,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon) {
+  Widget _buildBoardsGrid() {
+    return FutureBuilder<QuerySnapshot>(
+      future: FirebaseFirestore.instance
+          .collection('boards')
+          .where('createdBy', isEqualTo: widget.userId ?? _authService.currentUser!.uid)
+          .get(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (snapshot.hasError) {
+          return _buildBoardsError();
+        }
+        
+        final boards = snapshot.data?.docs ?? [];
+        
+        if (boards.isEmpty) {
+          return _buildBoardsEmpty();
+        }
+        
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.2,
+          ),
+          itemCount: boards.length,
+          itemBuilder: (context, index) {
+            final boardDoc = boards[index];
+            final boardData = boardDoc.data() as Map<String, dynamic>;
+            return _buildBoardCard(boardData);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildBoardCard(Map<String, dynamic> boardData) {
     return Container(
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Theme.of(context).primaryColor.withOpacity(0.2),
-        ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: telescopeCharcoal.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            color: Theme.of(context).primaryColor,
-            size: 20,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).primaryColor,
+          Container(
+            height: 80,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  telescopeBlue.withOpacity(0.3),
+                  telescopeYellow.withOpacity(0.3),
+                ],
+              ),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Stack(
+              children: [
+                if (boardData['coverPhotoUrl'] != null)
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: Image.network(
+                      boardData['coverPhotoUrl'],
+                      width: double.infinity,
+                      height: 80,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                else
+                  Center(
+                    child: Icon(
+                      Icons.dashboard,
+                      color: telescopeCharcoal,
+                      size: 32,
+                    ),
+                  ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: () => _showBoardOptions(boardData),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(
+                        Icons.more_horiz,
+                        size: 16,
+                        color: telescopeCharcoal,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey[600],
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    boardData['name'] ?? 'Untitled Board',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: telescopeCharcoal,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${(boardData['places'] as List?)?.length ?? 0} places',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: telescopeCharcoal.withOpacity(0.6),
+                    ),
+                  ),
+                  if (boardData['circleId'] != null) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: telescopeBlue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Circle Board',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: telescopeBlue,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
+
+  Widget _buildBoardsEmpty() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          Icon(
+            Icons.dashboard_outlined,
+            size: 64,
+            color: telescopeCharcoal.withOpacity(0.3),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No boards yet',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: telescopeCharcoal.withOpacity(0.6),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Create your first board to start curating places!',
+            style: TextStyle(
+              fontSize: 14,
+              color: telescopeCharcoal.withOpacity(0.5),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () {
+              // Navigate to create board
+            },
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Create Board'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: telescopeBlue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBoardsError() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 64,
+            color: Colors.red.withOpacity(0.6),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Error loading boards',
+            style: TextStyle(
+              fontSize: 16,
+              color: telescopeCharcoal.withOpacity(0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBoardOptions(Map<String, dynamic> boardData) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.share, color: telescopeBlue),
+              title: const Text('Share Board'),
+              onTap: () {
+                Navigator.pop(context);
+                // Implement share functionality
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.recommend, color: telescopeBlue),
+              title: const Text('Recommend to Friends'),
+              onTap: () {
+                Navigator.pop(context);
+                // Implement recommend functionality
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.edit, color: telescopeCharcoal),
+              title: const Text('Edit Board'),
+              onTap: () {
+                Navigator.pop(context);
+                // Navigate to edit board
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToFollowing() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Following'),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+          ),
+          body: FollowingTab(userId: widget.userId ?? _authService.currentUser!.uid),
+        ),
+      ),
+    );
+  }
+
+  void _navigateToFollowers() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Followers'),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+          ),
+          body: FollowersTab(userId: widget.userId ?? _authService.currentUser!.uid),
+        ),
+      ),
+    );
+  }
+
+  int _calculateActivityScore() {
+    // Simple activity calculation
+    return (_visitCount * 2) + ((_followStats?.followersCount ?? 0) * 1) + (_boardCount * 3);
+  }
+
+
+  Widget _buildVibeDNA() {
+    final primaryVibes = _user?.vibeProfile?.primaryVibes ?? [];
+    
+    // Add some default vibes if none exist
+    final displayVibes = primaryVibes.isNotEmpty ? primaryVibes : ['social', 'aesthetic'];
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: telescopeCharcoal.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: telescopeBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.psychology_outlined,
+                  color: telescopeBlue,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Your Vibe DNA',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: telescopeCharcoal,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    Text(
+                      'Your unique personality signature',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: telescopeCharcoal.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: displayVibes.map((vibe) => _buildTelescopeVibeChip(vibe)).toList(),
+          ),
+          if (displayVibes.length < 3) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: telescopeLightGrey,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: telescopeCharcoal.withOpacity(0.08),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.lightbulb_outline,
+                    color: telescopeBlue,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Complete more check-ins to discover your unique vibe pattern!',
+                      style: TextStyle(
+                        color: telescopeCharcoal.withOpacity(0.7),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTelescopeVibeChip(String vibe) {
+    final colors = _getVibeColors(vibe);
+    final icon = _getVibeIcon(vibe);
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            colors.first.withOpacity(0.1),
+            colors.last.withOpacity(0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colors.first.withOpacity(0.3),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: colors.first.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: colors.first,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            vibe.capitalize(),
+            style: TextStyle(
+              color: colors.first,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedVibeChip(String vibe) {
+    final colors = _getVibeColors(vibe);
+    final icon = _getVibeIcon(vibe);
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [colors.first, colors.last],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: colors.first.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: Colors.white,
+            size: 16,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            vibe.capitalize(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getVibeIcon(String vibe) {
+    const vibeIconMap = {
+      'cozy': Icons.home,
+      'active': Icons.directions_run,
+      'aesthetic': Icons.palette,
+      'adventurous': Icons.explore,
+      'luxurious': Icons.diamond,
+      'social': Icons.people,
+      'chill': Icons.self_improvement,
+      'intimate': Icons.favorite,
+      'trendy': Icons.trending_up,
+      'romantic': Icons.favorite_border,
+    };
+    return vibeIconMap[vibe] ?? Icons.tag;
+  }
+
+
+
+
+
+
+
+
+
 
   List<Color> _getVibeColors(String vibe) {
     const vibeColorMap = {
@@ -997,7 +1893,7 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      color: Colors.white,
+      color: _EnhancedProfileScreenState.telescopeLightGrey,
       child: tabBar,
     );
   }

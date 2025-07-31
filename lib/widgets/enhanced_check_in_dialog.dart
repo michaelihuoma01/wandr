@@ -330,7 +330,7 @@ class _EnhancedCheckInBottomSheetState extends State<EnhancedCheckInBottomSheet>
               .map((vibe) {
             final isSelected = _selectedVibes.contains(vibe.id);
             return FilterChip(
-              label: Text('${vibe.emoji} ${vibe.name}'),
+              label: Text('${vibe.icon} ${vibe.name}'),
               selected: isSelected,
               onSelected: (selected) {
                 setState(() {

@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'profile_setup_screen.dart';
-import 'home_screen.dart';
+import 'enhanced_home_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -33,7 +33,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          MaterialPageRoute(builder: (context) => const EnhancedHomeScreen()),
         );
       }
     } else if (result.error != null && result.error != 'Sign in cancelled') {

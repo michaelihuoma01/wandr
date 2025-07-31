@@ -241,7 +241,7 @@ class _CheckInDialogState extends State<CheckInDialog> {
               .map((vibe) {
             final isSelected = _selectedVibes.contains(vibe.id);
             return FilterChip(
-              label: Text('${vibe.emoji} ${vibe.name}'),
+              label: Text('${vibe.icon} ${vibe.name}'),
               selected: isSelected,
               onSelected: (selected) {
                 setState(() {
@@ -254,7 +254,7 @@ class _CheckInDialogState extends State<CheckInDialog> {
               },
               selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
               checkmarkColor: Theme.of(context).primaryColor,
-              avatar: isSelected ? null : Text(vibe.emoji),
+              avatar: isSelected ? null : Text(vibe.icon),
             );
           }).toList(),
         ),
@@ -288,7 +288,7 @@ class _CheckInDialogState extends State<CheckInDialog> {
                     final vibe = VibeConstants.getVibeById(vibeId);
                     return Chip(
                       label: Text(
-                        '${vibe?.emoji ?? ''} ${vibe?.name ?? vibeId}',
+                        '${vibe?.icon ?? ''} ${vibe?.name ?? vibeId}',
                         style: const TextStyle(fontSize: 12),
                       ),
                       deleteIcon: const Icon(Icons.close, size: 16),

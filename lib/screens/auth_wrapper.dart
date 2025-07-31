@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../screens/enhanced_auth_screen.dart';
 import '../screens/onboarding/welcome_screen.dart';
-import '../screens/home_screen.dart';
+import '../screens/enhanced_home_screen.dart';
 
 class AuthWrapper extends StatelessWidget {
   final AuthService _authService = AuthService();
@@ -47,7 +47,7 @@ class AuthWrapper extends StatelessWidget {
             }
 
             // User is fully set up - show home screen
-            return const HomeScreen();
+            return const EnhancedHomeScreen();
           },
         );
       },

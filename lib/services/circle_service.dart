@@ -4,8 +4,8 @@ import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:myapp/models/models.dart';
-import 'package:myapp/models/visit_models.dart';
+import '../models/models.dart';
+import '../models/visit_models.dart';
 import '../models/circle_models.dart';
 import 'auth_service.dart';
 
@@ -109,7 +109,7 @@ class CircleService {
     }
   }
 
-  Future<CircleResult> joinCircle(String circleId, {String? inviteCode}) async {
+  Future<CircleResult> joinCircleWithCode(String circleId, {String? inviteCode}) async {
     if (_userId == null) {
       return CircleResult(success: false, error: 'User not authenticated');
     }
@@ -251,13 +251,14 @@ class CircleService {
     }
   }
 
-  Future<List<VibeCircle>> getUserCircles() async {
-    if (_userId == null) return [];
+  Future<List<VibeCircle>> getUserCircles([String? userId]) async {
+    final targetUserId = userId ?? _userId;
+    if (targetUserId == null) return [];
 
     try {
       final userCircles = await firestore
           .collection('users')
-          .doc(_userId)
+          .doc(targetUserId)
           .collection('circles')
           .get();
 
@@ -283,6 +284,59 @@ class CircleService {
     } catch (e) {
       print('Error getting user circles: $e');
       return [];
+    }
+  }
+
+  Future<List<VibeCircle>> getPublicCircles({int limit = 20}) async {
+    try {
+      final snapshot = await firestore
+          .collection('circles')
+          .where('isPublic', isEqualTo: true)
+          .orderBy('memberCount', descending: true)
+          .limit(limit)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => VibeCircle.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      print('Error getting public circles: $e');
+      return [];
+    }
+  }
+
+  Future<CircleResult> joinCircle(String circleId, String userId) async {
+    try {
+      final circleDoc = await firestore.collection('circles').doc(circleId).get();
+      if (!circleDoc.exists) {
+        return CircleResult(success: false, error: 'Circle not found');
+      }
+
+      final circle = VibeCircle.fromFirestore(circleDoc);
+
+      // Check if already a member
+      final memberDoc = await firestore
+          .collection('circles')
+          .doc(circleId)
+          .collection('members')
+          .doc(userId)
+          .get();
+
+      if (memberDoc.exists) {
+        return CircleResult(success: false, error: 'Already a member of this circle');
+      }
+
+      // Check member limit
+      if (circle.memberLimit != null && circle.memberCount >= circle.memberLimit!) {
+        return CircleResult(success: false, error: 'Circle is full');
+      }
+
+      // Add member
+      await addMemberToCircle(circleId, userId);
+
+      return CircleResult(success: true, message: 'Successfully joined circle');
+    } catch (e) {
+      return CircleResult(success: false, error: e.toString());
     }
   }
 

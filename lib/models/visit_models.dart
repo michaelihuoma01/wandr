@@ -1,6 +1,7 @@
 // lib/models/visit_models.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:json_annotation/json_annotation.dart';
+import 'vibe_tag_models.dart';
 
 part 'visit_models.g.dart';
 
@@ -156,48 +157,33 @@ class PlaceVisit {
   }
 }
 
-// Predefined vibe tags
-class VibeTag {
-  final String id;
-  final String name;
-  final String emoji;
-  final String category; // mood, atmosphere, crowd, style
-
-  const VibeTag({
-    required this.id,
-    required this.name,
-    required this.emoji,
-    required this.category,
-  });
-}
+// Note: VibeTag model is now in vibe_tag_models.dart
 
 // Predefined vibe tags users can select
+// Note: This is now deprecated - use PredefinedVibeTags from vibe_tag_models.dart
 class VibeConstants {
-  static const List<VibeTag> allVibes = [
-    // Mood vibes
-    VibeTag(id: 'romantic', name: 'Romantic', emoji: '💕', category: 'mood'),
-    VibeTag(id: 'fun', name: 'Fun', emoji: '🎉', category: 'mood'),
-    VibeTag(id: 'relaxing', name: 'Relaxing', emoji: '😌', category: 'mood'),
-    VibeTag(id: 'exciting', name: 'Exciting', emoji: '🔥', category: 'mood'),
-    
-    // Atmosphere vibes
-    VibeTag(id: 'cozy', name: 'Cozy', emoji: '🛋️', category: 'atmosphere'),
-    VibeTag(id: 'lively', name: 'Lively', emoji: '🎭', category: 'atmosphere'),
-    VibeTag(id: 'intimate', name: 'Intimate', emoji: '🕯️', category: 'atmosphere'),
-    VibeTag(id: 'energetic', name: 'Energetic', emoji: '⚡', category: 'atmosphere'),
-    
-    // Crowd vibes
-    VibeTag(id: 'trendy', name: 'Trendy', emoji: '✨', category: 'crowd'),
-    VibeTag(id: 'hipster', name: 'Hipster', emoji: '🎨', category: 'crowd'),
-    VibeTag(id: 'family_friendly', name: 'Family Friendly', emoji: '👨‍👩‍👧‍👦', category: 'crowd'),
-    VibeTag(id: 'professional', name: 'Professional', emoji: '💼', category: 'crowd'),
-    
-    // Style vibes
-    VibeTag(id: 'aesthetic', name: 'Aesthetic', emoji: '📸', category: 'style'),
-    VibeTag(id: 'rustic', name: 'Rustic', emoji: '🌿', category: 'style'),
-    VibeTag(id: 'modern', name: 'Modern', emoji: '🏙️', category: 'style'),
-    VibeTag(id: 'vintage', name: 'Vintage', emoji: '🕰️', category: 'style'),
-  ];
+  static List<VibeTag> get allVibes {
+    // Convert from the comprehensive vibe tag system
+    return PredefinedVibeTags.coreTags.entries.map((entry) {
+      final id = entry.key;
+      final data = entry.value;
+      return VibeTag(
+        id: id,
+        name: id,
+        displayName: data['displayName'] as String,
+        description: data['description'] as String,
+        category: data['category'] as String,
+        synonyms: List<String>.from(data['synonyms'] as List),
+        color: data['color'] as String,
+        icon: data['icon'] as String,
+        popularity: 0.5, // Default popularity
+        contextWeights: Map<String, double>.from(data['contextWeights'] as Map),
+        createdAt: DateTime.now(),
+        lastUsed: DateTime.now(),
+        usageCount: 0,
+      );
+    }).toList();
+  }
 
   static VibeTag? getVibeById(String id) {
     try {

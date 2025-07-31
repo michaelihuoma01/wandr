@@ -355,7 +355,7 @@ class VisitCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              '${vibe?.emoji ?? ''} ${vibe?.name ?? vibeId}',
+              '${vibe?.icon ?? ''} ${vibe?.name ?? vibeId}',
               style: TextStyle(
                 fontSize: 12,
                 color: Theme.of(context).primaryColor,
@@ -399,7 +399,7 @@ class VisitCard extends StatelessWidget {
   Widget _buildCompactVibes(BuildContext context) {
     final vibes = visit.vibes.take(2).map((vibeId) {
       final vibe = VibeConstants.getVibeById(vibeId);
-      return vibe?.emoji ?? '';
+      return vibe?.icon ?? '';
     }).join(' ');
 
     return Row(

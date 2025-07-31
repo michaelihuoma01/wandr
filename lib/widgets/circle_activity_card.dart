@@ -308,7 +308,7 @@ class _CircleActivityCardState extends State<CircleActivityCard> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '${vibe?.emoji ?? ''} ${vibe?.name ?? vibeId}',
+                    '${vibe?.icon ?? ''} ${vibe?.name ?? vibeId}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context).primaryColor,

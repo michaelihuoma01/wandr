@@ -1,13 +1,13 @@
 // lib/screens/circles/circles_list_screen.dart
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/services.dart';
 import '../../models/circle_models.dart';
+import '../../services/enhanced_circle_service.dart';
 import '../../services/circle_service.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/circle_card.dart';
-import 'create_circle_screen.dart';
 import 'circle_detail_screen.dart';
-import 'join_circle_dialog.dart';
+import 'create_circle_screen.dart';
 
 class CirclesListScreen extends StatefulWidget {
   const CirclesListScreen({super.key});
@@ -17,139 +17,116 @@ class CirclesListScreen extends StatefulWidget {
 }
 
 class _CirclesListScreenState extends State<CirclesListScreen> 
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
+  final EnhancedCircleService _enhancedCircleService = EnhancedCircleService();
   final CircleService _circleService = CircleService();
   final AuthService _authService = AuthService();
   
   late TabController _tabController;
-  final TextEditingController _searchController = TextEditingController();
-  
   List<VibeCircle> _myCircles = [];
-  List<VibeCircle> _discoverCircles = [];
-  List<SuggestedCircle> _suggestedCircles = [];
-  
-  bool _isLoadingMyCircles = true;
-  bool _isLoadingDiscover = true;
-  bool _isLoadingSuggestions = true;
-  
-  CircleCategory? _selectedCategory;
-  List<String> _selectedVibes = [];
-  String _searchQuery = '';
+  List<Map<String, dynamic>> _suggestedCircles = [];
+  List<VibeCircle> _allCircles = [];
+  bool _isLoading = true;
+  String _activeTab = 'my_circles';
+
+  static const List<String> _tabs = ['my_circles', 'suggested', 'discover'];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _loadData();
+    _setupController();
+    _loadCircles();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadData() async {
-    await Future.wait([
-      _loadMyCircles(),
-      _loadDiscoverCircles(),
-      _loadSuggestions(),
-    ]);
-  }
-
-  Future<void> _loadMyCircles() async {
-    setState(() => _isLoadingMyCircles = true);
-    
-    try {
-      final circles = await _circleService.getUserCircles();
-      if (mounted) {
+  void _setupController() {
+    _tabController = TabController(length: _tabs.length, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
         setState(() {
-          _myCircles = circles;
-          _isLoadingMyCircles = false;
+          _activeTab = _tabs[_tabController.index];
         });
       }
+    });
+  }
+
+  Future<void> _loadCircles() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final currentUser = _authService.currentUser;
+      if (currentUser == null) return;
+
+      // Load all circle types in parallel
+      final futures = await Future.wait([
+        _circleService.getUserCircles(currentUser.uid),
+        _enhancedCircleService.getVibeCompatibleCircles(currentUser.uid, limit: 15),
+        _circleService.getPublicCircles(limit: 20),
+      ]);
+
+      setState(() {
+        _myCircles = futures[0] as List<VibeCircle>;
+        _suggestedCircles = futures[1] as List<Map<String, dynamic>>;
+        _allCircles = futures[2] as List<VibeCircle>;
+        _isLoading = false;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingMyCircles = false);
-      }
+      print('Error loading circles: $e');
+      setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _loadDiscoverCircles() async {
-    setState(() => _isLoadingDiscover = true);
-    
+  Future<void> _joinCircle(String circleId) async {
     try {
-      final circles = await _circleService.discoverCircles(
-        category: _selectedCategory,
-        vibePreferences: _selectedVibes,
-        searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
-      );
+      final currentUser = _authService.currentUser;
+      if (currentUser == null) return;
+
+      final result = await _circleService.joinCircle(circleId, currentUser.uid);
       
-      if (mounted) {
-        setState(() {
-          _discoverCircles = circles;
-          _isLoadingDiscover = false;
-        });
+      if (result.success) {
+        HapticFeedback.lightImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message ?? 'Successfully joined circle!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Refresh circles
+        _loadCircles();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'Failed to join circle'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingDiscover = false);
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to join circle: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
-  Future<void> _loadSuggestions() async {
-    setState(() => _isLoadingSuggestions = true);
-    
-    try {
-      final suggestions = await _circleService.getCircleSuggestions();
-      if (mounted) {
-        setState(() {
-          _suggestedCircles = suggestions;
-          _isLoadingSuggestions = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingSuggestions = false);
-      }
-    }
-  }
-
-  void _showJoinDialog(VibeCircle circle) {
-    showDialog(
-      context: context,
-      builder: (context) => JoinCircleDialog(
-        circle: circle,
-        onJoined: () {
-          _loadMyCircles();
-          _navigateToCircle(circle);
-        },
-      ),
-    );
-  }
-
-  void _navigateToCircle(VibeCircle circle) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CircleDetailScreen(circleId: circle.id),
-      ),
-    ).then((_) => _loadMyCircles());
-  }
-
-  void _navigateToCreateCircle() {
-    Navigator.push(
-      context,
+  Future<void> _createCircle() async {
+    final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (context) => const CreateCircleScreen(),
       ),
-    ).then((created) {
-      if (created == true) {
-        _loadMyCircles();
-      }
-    });
+    );
+
+    if (result == true) {
+      _loadCircles(); // Refresh after creating
+    }
   }
 
   @override
@@ -157,65 +134,110 @@ class _CirclesListScreenState extends State<CirclesListScreen>
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Vibe Circles'),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new, color: Colors.grey[800], size: 22),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Circles',
+          style: TextStyle(
+            color: Colors.grey[800],
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
+        centerTitle: false,
         elevation: 0,
         backgroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline),
+            onPressed: _createCircle,
+            tooltip: 'Create Circle',
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'My Circles'),
-            Tab(text: 'Discover'),
-            Tab(text: 'For You'),
-          ],
           labelColor: Theme.of(context).primaryColor,
-          unselectedLabelColor: Colors.grey,
+          unselectedLabelColor: Colors.grey[600],
           indicatorColor: Theme.of(context).primaryColor,
+          labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          tabs: [
+            Tab(text: 'My Circles (${_myCircles.length})'),
+            Tab(text: 'Suggested (${_suggestedCircles.length})'),
+            const Tab(text: 'Discover'),
+          ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
           _buildMyCirclesTab(),
+          _buildSuggestedTab(),
           _buildDiscoverTab(),
-          _buildForYouTab(),
         ],
       ),
-      floatingActionButton: _tabController.index == 0 
-          ? FloatingActionButton.extended(
-              onPressed: _navigateToCreateCircle,
-              icon: const Icon(Icons.add),
-              label: const Text('Create Circle'),
-              backgroundColor: Theme.of(context).primaryColor,
-            )
-          : null,
+      floatingActionButton: FloatingActionButton(
+        onPressed: _createCircle,
+        backgroundColor: Theme.of(context).primaryColor,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
+      ),
     );
   }
 
   Widget _buildMyCirclesTab() {
-    if (_isLoadingMyCircles) {
+    if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
     if (_myCircles.isEmpty) {
-      return _buildEmptyState(
-        icon: Icons.group_outlined,
-        title: 'No Circles Yet',
-        subtitle: 'Join or create a circle to start sharing your favorite places',
-        actionLabel: 'Create Your First Circle',
-        onAction: _navigateToCreateCircle,
-      );
+      return _buildEmptyMyCirclesState();
     }
 
     return RefreshIndicator(
-      onRefresh: _loadMyCircles,
+      onRefresh: _loadCircles,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _myCircles.length,
         itemBuilder: (context, index) {
-          return CircleCard(
-            circle: _myCircles[index],
-            onTap: () => _navigateToCircle(_myCircles[index]),
-            showJoinButton: false,
+          final circle = _myCircles[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: CircleCard(
+              circle: circle,
+              onTap: () => _navigateToCircleDetail(circle.id),
+              showJoinButton: false, // Already a member
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSuggestedTab() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_suggestedCircles.isEmpty) {
+      return _buildEmptySuggestedState();
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadCircles,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _suggestedCircles.length,
+        itemBuilder: (context, index) {
+          final circleData = _suggestedCircles[index];
+          final circle = circleData['circle'] as VibeCircle;
+          final compatibility = circleData['compatibility'] as double;
+          final matchReasons = circleData['matchReasons'] as List<String>;
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildSuggestedCircleCard(circle, compatibility, matchReasons),
           );
         },
       ),
@@ -223,307 +245,187 @@ class _CirclesListScreenState extends State<CirclesListScreen>
   }
 
   Widget _buildDiscoverTab() {
-    return Column(
-      children: [
-        _buildSearchAndFilters(),
-        Expanded(
-          child: _isLoadingDiscover
-              ? const Center(child: CircularProgressIndicator())
-              : _discoverCircles.isEmpty
-                  ? _buildEmptyState(
-                      icon: Icons.search_off,
-                      title: 'No Circles Found',
-                      subtitle: 'Try adjusting your filters or search terms',
-                      actionLabel: 'Clear Filters',
-                      onAction: () {
-                        setState(() {
-                          _selectedCategory = null;
-                          _selectedVibes = [];
-                          _searchController.clear();
-                          _searchQuery = '';
-                        });
-                        _loadDiscoverCircles();
-                      },
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadDiscoverCircles,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _discoverCircles.length,
-                        itemBuilder: (context, index) {
-                          final circle = _discoverCircles[index];
-                          final isMember = _myCircles.any((c) => c.id == circle.id);
-                          
-                          return CircleCard(
-                            circle: circle,
-                            onTap: isMember 
-                                ? () => _navigateToCircle(circle)
-                                : () => _showJoinDialog(circle),
-                            showJoinButton: !isMember,
-                          );
-                        },
-                      ),
-                    ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildForYouTab() {
-    if (_isLoadingSuggestions) {
+    if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_suggestedCircles.isEmpty) {
-      return _buildEmptyState(
-        icon: Icons.auto_awesome,
-        title: 'No Suggestions Yet',
-        subtitle: 'Check in to more places to get personalized circle recommendations',
-      );
+    if (_allCircles.isEmpty) {
+      return _buildEmptyDiscoverState();
     }
 
     return RefreshIndicator(
-      onRefresh: _loadSuggestions,
+      onRefresh: _loadCircles,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: _suggestedCircles.length,
+        itemCount: _allCircles.length,
         itemBuilder: (context, index) {
-          final suggestion = _suggestedCircles[index];
-          final isMember = _myCircles.any((c) => c.id == suggestion.circle.id);
+          final circle = _allCircles[index];
+          final isAlreadyMember = _myCircles.any((mc) => mc.id == circle.id);
           
-          return _buildSuggestionCard(suggestion, isMember);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: CircleCard(
+              circle: circle,
+              onTap: () => _navigateToCircleDetail(circle.id),
+              showJoinButton: !isAlreadyMember,
+              onJoin: isAlreadyMember ? null : () => _joinCircle(circle.id),
+            ),
+          );
         },
       ),
     );
   }
 
-  Widget _buildSearchAndFilters() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // Search bar
-          TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search circles...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                        _loadDiscoverCircles();
-                      },
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              filled: true,
-              fillColor: Colors.grey[100],
-            ),
-            onChanged: (value) {
-              setState(() => _searchQuery = value);
-              if (value.isEmpty || value.length > 2) {
-                _loadDiscoverCircles();
-              }
-            },
-          ),
-          const SizedBox(height: 12),
-          // Category filter
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _buildCategoryChip(null, 'All'),
-                ...CircleCategory.values.map((category) => 
-                  _buildCategoryChip(category, category.displayName)
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryChip(CircleCategory? category, String label) {
-    final isSelected = _selectedCategory == category;
-    
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (category != null) ...[
-              Text(category.emoji),
-              const SizedBox(width: 4),
-            ],
-            Text(label),
-          ],
-        ),
-        selected: isSelected,
-        onSelected: (selected) {
-          setState(() {
-            _selectedCategory = selected ? category : null;
-          });
-          _loadDiscoverCircles();
-        },
-        selectedColor: Theme.of(context).primaryColor,
-        labelStyle: TextStyle(
-          color: isSelected ? Colors.white : Colors.black,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSuggestionCard(SuggestedCircle suggestion, bool isMember) {
+  Widget _buildSuggestedCircleCard(VibeCircle circle, double compatibility, List<String> matchReasons) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey[200]!),
-      ),
+      margin: EdgeInsets.zero,
       child: InkWell(
-        onTap: isMember 
-            ? () => _navigateToCircle(suggestion.circle)
-            : () => _showJoinDialog(suggestion.circle),
-        borderRadius: BorderRadius.circular(16),
+        onTap: () => _navigateToCircleDetail(circle.id),
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Compatibility badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.purple.withOpacity(0.1),
-                      Colors.blue.withOpacity(0.1),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.auto_awesome, size: 16, color: Colors.purple),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${(suggestion.compatibilityScore * 100).toInt()}% Match',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.purple,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Circle info
               Row(
                 children: [
-                  _buildCircleAvatar(suggestion.circle),
-                  const SizedBox(width: 12),
+                  // Circle avatar
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).primaryColor,
+                          Theme.of(context).primaryColor.withOpacity(0.7),
+                        ],
+                      ),
+                    ),
+                    child: circle.imageUrl != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              circle.imageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => 
+                                  const Icon(Icons.group, color: Colors.white, size: 24),
+                            ),
+                          )
+                        : const Icon(Icons.group, color: Colors.white, size: 24),
+                  ),
+                  
+                  const SizedBox(width: 16),
+                  
+                  // Circle info
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          suggestion.circle.name,
+                          circle.name,
                           style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          suggestion.circle.category.displayName,
+                          circle.description,
                           style: TextStyle(
-                            fontSize: 14,
                             color: Colors.grey[600],
+                            fontSize: 14,
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                  if (!isMember)
-                    ElevatedButton(
-                      onPressed: () => _showJoinDialog(suggestion.circle),
-                      style: ElevatedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: const Text('Join'),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.green[50],
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.check_circle, size: 16, color: Colors.green[700]),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Member',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.green[700],
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                  
+                  // Compatibility score
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _getCompatibilityColor(compatibility).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${(compatibility * 100).round()}% match',
+                      style: TextStyle(
+                        color: _getCompatibilityColor(compatibility),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
                       ),
                     ),
+                  ),
                 ],
               ),
+              
               const SizedBox(height: 12),
-              // Matching vibes
-              if (suggestion.matchingVibes.isNotEmpty) ...[
+              
+              // Match reasons
+              if (matchReasons.isNotEmpty) ...[
                 Text(
-                  suggestion.reason ?? 'Matches your vibes:',
+                  'Why this matches:',
                   style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
+                    color: Colors.grey[700],
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Wrap(
                   spacing: 6,
-                  runSpacing: 6,
-                  children: suggestion.matchingVibes.take(4).map((vibe) {
+                  runSpacing: 4,
+                  children: matchReasons.take(3).map((reason) {
                     return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
+                        color: Theme.of(context).primaryColor.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        vibe,
+                        reason,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           color: Theme.of(context).primaryColor,
                         ),
                       ),
                     );
                   }).toList(),
                 ),
+                const SizedBox(height: 12),
               ],
+              
+              // Action buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _navigateToCircleDetail(circle.id),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Theme.of(context).primaryColor),
+                      ),
+                      child: Text(
+                        'View Details',
+                        style: TextStyle(color: Theme.of(context).primaryColor),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _joinCircle(circle.id),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Join Circle'),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -531,31 +433,7 @@ class _CirclesListScreenState extends State<CirclesListScreen>
     );
   }
 
-  Widget _buildCircleAvatar(VibeCircle circle) {
-    if (circle.imageUrl != null) {
-      return CircleAvatar(
-        radius: 30,
-        backgroundImage: CachedNetworkImageProvider(circle.imageUrl!),
-      );
-    }
-    
-    return CircleAvatar(
-      radius: 30,
-      backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-      child: Text(
-        circle.category.emoji,
-        style: const TextStyle(fontSize: 24),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    String? actionLabel,
-    VoidCallback? onAction,
-  }) {
+  Widget _buildEmptyMyCirclesState() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -563,43 +441,132 @@ class _CirclesListScreenState extends State<CirclesListScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              icon,
+              Icons.group_add,
               size: 80,
-              color: Colors.grey[300],
+              color: Colors.grey[400],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             Text(
-              title,
-              style: TextStyle(
-                fontSize: 20,
+              'No Circles Yet',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
+                color: Colors.grey[700],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[500],
+              'Create your first circle or join existing ones to connect with people who share your vibes',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[600],
               ),
               textAlign: TextAlign.center,
             ),
-            if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: onAction,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(actionLabel),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: _createCircle,
+              icon: const Icon(Icons.add),
+              label: const Text('Create Circle'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
-            ],
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptySuggestedState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.psychology_outlined,
+              size: 80,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Suggestions Yet',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Complete your vibe profile to get personalized circle recommendations',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyDiscoverState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.explore_outlined,
+              size: 80,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Public Circles',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Be the first to create a public circle in your area',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: _createCircle,
+              icon: const Icon(Icons.add),
+              label: const Text('Create First Circle'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getCompatibilityColor(double compatibility) {
+    if (compatibility >= 0.8) return Colors.green;
+    if (compatibility >= 0.6) return Colors.orange;
+    return Colors.grey;
+  }
+
+  void _navigateToCircleDetail(String circleId) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => CircleDetailScreen(circleId: circleId),
       ),
     );
   }

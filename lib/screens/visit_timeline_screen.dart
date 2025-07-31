@@ -269,7 +269,7 @@ class VisitTimelineScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        '${vibe?.emoji ?? ''} ${vibe?.name ?? vibeId}',
+                        '${vibe?.icon ?? ''} ${vibe?.name ?? vibeId}',
                         style: TextStyle(
                           fontSize: 12,
                           color: Theme.of(context).primaryColor,

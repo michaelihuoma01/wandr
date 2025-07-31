@@ -1,9 +1,9 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:myapp/screens/circles/circle_detail_screen.dart';
-import 'package:myapp/services/notification_service.dart';
-import 'screens/home_screen.dart';
+import 'screens/circles/circle_detail_screen.dart';
+import 'services/notification_service.dart';
+import 'screens/enhanced_home_screen.dart';
 import 'screens/auth_wrapper.dart';
 import 'screens/enhanced_auth_screen.dart';
 import 'screens/onboarding/welcome_screen.dart';
@@ -11,7 +11,7 @@ import 'screens/onboarding/vibe_wheel_screen.dart';
 import 'screens/onboarding/contextual_preferences_screen.dart';
 import 'screens/onboarding/social_matching_screen.dart';
 import 'screens/enhanced_profile_screen.dart';
-import 'screens/user_discovery_screen.dart';
+import 'screens/discovery/visual_discovery_screen.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 
@@ -107,13 +107,13 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       routes: {
         '/auth': (context) => const EnhancedAuthScreen(),
-        '/home': (context) => const HomeScreen(),
+        '/home': (context) => const EnhancedHomeScreen(),
         '/onboarding': (context) => const OnboardingWelcomeScreen(),
         '/onboarding/vibe-wheel': (context) => const VibeWheelScreen(),
         '/onboarding/contextual-preferences': (context) => const ContextualPreferencesScreen(),
         '/onboarding/social-matching': (context) => const SocialMatchingScreen(),
         '/profile': (context) => const EnhancedProfileScreen(),
-        '/discover': (context) => const UserDiscoveryScreen(),
+        '/discover': (context) => const VisualDiscoveryScreen(),
       },
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

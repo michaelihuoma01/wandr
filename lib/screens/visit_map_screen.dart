@@ -260,7 +260,7 @@ class _VisitMapScreenState extends State<VisitMapScreen> {
                     final vibe = VibeConstants.getVibeById(vibeId);
                     return Chip(
                       label: Text(
-                        '${vibe?.emoji ?? ''} ${vibe?.name ?? vibeId}',
+                        '${vibe?.icon ?? ''} ${vibe?.name ?? vibeId}',
                         style: const TextStyle(fontSize: 12),
                       ),
                       backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),

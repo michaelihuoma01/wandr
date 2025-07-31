@@ -183,7 +183,7 @@ class _VisitFilterSheetState extends State<VisitFilterSheet> {
                   children: categoryVibes.map((vibe) {
                     final isSelected = _tempFilter.vibes.contains(vibe.id);
                     return FilterChip(
-                      label: Text('${vibe.emoji} ${vibe.name}'),
+                      label: Text('${vibe.icon} ${vibe.name}'),
                       selected: isSelected,
                       onSelected: (selected) {
                         setState(() {

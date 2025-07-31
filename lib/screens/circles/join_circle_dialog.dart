@@ -1,6 +1,6 @@
 // lib/screens/circles/join_circle_dialog.dart
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+// Using NetworkImage instead of cached_network_image
 import '../../models/circle_models.dart';
 import '../../services/circle_service.dart';
 
@@ -45,7 +45,7 @@ class _JoinCircleDialogState extends State<JoinCircleDialog> {
       _errorMessage = null;
     });
 
-    final result = await _circleService.joinCircle(
+    final result = await _circleService.joinCircleWithCode(
       widget.circle.id,
       inviteCode: _inviteCodeController.text.isEmpty ? null : _inviteCodeController.text,
     );
@@ -360,7 +360,7 @@ class _JoinCircleDialogState extends State<JoinCircleDialog> {
     if (widget.circle.imageUrl != null && widget.circle.imageUrl!.isNotEmpty) {
       return CircleAvatar(
         radius: 50,
-        backgroundImage: CachedNetworkImageProvider(widget.circle.imageUrl!),
+        backgroundImage: NetworkImage(widget.circle.imageUrl!),
         backgroundColor: Colors.grey[200],
       );
     }

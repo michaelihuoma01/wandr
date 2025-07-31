@@ -393,7 +393,7 @@ class _CreateCircleScreenState extends State<CreateCircleScreen> {
               .map((vibe) {
             final isSelected = _selectedVibes.contains(vibe.id);
             return FilterChip(
-              label: Text('${vibe.emoji} ${vibe.name}'),
+              label: Text('${vibe.icon} ${vibe.name}'),
               selected: isSelected,
               onSelected: (selected) {
                 setState(() {
@@ -406,7 +406,7 @@ class _CreateCircleScreenState extends State<CreateCircleScreen> {
               },
               selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
               checkmarkColor: Theme.of(context).primaryColor,
-              avatar: isSelected ? null : Text(vibe.emoji),
+              avatar: isSelected ? null : Text(vibe.icon),
             );
           }).toList(),
         ),

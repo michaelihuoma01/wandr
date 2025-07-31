@@ -181,7 +181,7 @@ class _VisitHistoryScreenState extends State<VisitHistoryScreen>
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: Chip(
-                  label: Text('${vibe?.emoji ?? ''} ${vibe?.name ?? vibeId}'),
+                  label: Text('${vibe?.icon ?? ''} ${vibe?.name ?? vibeId}'),
                   onDeleted: () {
                     setState(() {
                       final newVibes = Set<String>.from(_currentFilter.vibes);

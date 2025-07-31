@@ -2,11 +2,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:myapp/models/models.dart';
-import 'package:myapp/screens/circles/circles_list_screen.dart';
-import 'package:myapp/screens/history_screen.dart';
-import 'package:myapp/screens/vibe_quiz_screen.dart';
-import 'package:myapp/widgets/admin_test_data_panel.dart';
+import '../models/models.dart';
+import 'circles/circles_list_screen.dart';
+import 'history_screen.dart';
+import 'vibe_quiz_screen.dart';
+import '../widgets/admin_test_data_panel.dart';
 
 import '../services/auth_service.dart';
 import '../services/location_service.dart';
